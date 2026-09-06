@@ -79,6 +79,46 @@ logger = logging.getLogger("trae-cn-relay")
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "8000"))
 API_KEYS = [k.strip() for k in os.environ.get("RELAY_API_KEYS", "").split(",") if k.strip()]
+# Optional model allowlist (comma-separated model ids, lowercase compare).
+# Empty = expose everything the upstream offers; otherwise /v1/models and
+# dispatch only accept listed ids. Compare lowercase so catalog casing
+# variants (DeepSeek-V4-Flash vs deepseek-v4-flash) behave uniformly.
+# Runtime edits from the web console persist to data/model-allowlist.json,
+# which overrides the .env value on the next start.
+MODEL_ALLOWLIST: set[str] = {
+    m.strip().lower()
+    for m in os.environ.get("TRAE_MODEL_ALLOWLIST", "").split(",")
+    if m.strip()
+}
+ALLOWLIST_PATH = os.path.join("data", "model-allowlist.json")
+
+
+def _load_allowlist_file() -> None:
+    if not os.path.isfile(ALLOWLIST_PATH):
+        return
+    try:
+        with open(ALLOWLIST_PATH, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+        ids = payload.get("ids") if isinstance(payload, dict) else payload
+        if isinstance(ids, list):
+            MODEL_ALLOWLIST.clear()
+            MODEL_ALLOWLIST.update(
+                str(m).strip().lower() for m in ids if str(m).strip()
+            )
+    except (OSError, ValueError):
+        pass
+
+
+def _save_allowlist_file() -> None:
+    try:
+        os.makedirs(os.path.dirname(ALLOWLIST_PATH) or ".", exist_ok=True)
+        with open(ALLOWLIST_PATH, "w", encoding="utf-8") as fh:
+            json.dump(sorted(MODEL_ALLOWLIST), fh, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+
+_load_allowlist_file()
 UPSTREAM_MODE = (os.environ.get("UPSTREAM_MODE", "remote") or "remote").lower()
 
 FORWARD_USAGE = (os.environ.get("FORWARD_USAGE", "true") or "true").lower() == "true"
@@ -276,6 +316,7 @@ PUBLIC_PATHS = {
     "/api/checkin/work-credits",
     "/api/usage/last",
     "/api/usage/records",
+    "/api/allowlist",
     # Dashboard-only diagnostic, grouped with the other local console
     # endpoints. It sends a fixed one-line probe and returns no credential.
     "/api/model-test",
@@ -671,6 +712,8 @@ def _web_login_html() -> str:
             <th>时间</th>
             <th>账号</th>
             <th>模型</th>
+            <th class="numeric">首字</th>
+            <th class="numeric">耗时</th>
             <th class="numeric">Tokens（入 / 出 / 总）</th>
             <th class="numeric">消耗积分</th>
             <th>状态</th>
@@ -694,7 +737,9 @@ def _web_login_html() -> str:
             else '<span class="badge badge-active" data-account-active hidden>当前</span>'
         )
         active_row = " active-row" if acc.get("is_active") else ""
-        switch_disabled = " disabled" if acc.get("is_active") else ""
+        # allow clicking "switch" even on the active account; switchAccount()
+        # gives an explicit toast instead of a silently disabled button
+        switch_disabled = ""
         aid = acc.get("id") or ""
         label = acc.get("label") or acc.get("user_id") or aid
         uid = acc.get("user_id") or aid
@@ -926,16 +971,19 @@ hr {{ border: none; border-top: 1px solid #2d3140; margin: 16px 0; }}
 <p style="font-size:13px;color:#9aa0b0;margin-bottom:8px;line-height:1.5">
   1. 点击下方按钮后会自动检测本机授权助手（<code>127.0.0.1:{listener_port}</code>）。<br>
   2. 若未检测到，请先下载 <code>web_login.py</code>（或一键 <code>start_auth.bat</code>）并在<b>本机</b>运行，再重试。<br>
-  3. 确保浏览器已登录 <a href="https://www.trae.cn" target="_blank" rel="noopener" style="color:#8ab4f8">trae.cn</a>，授权完成后凭据自动写入服务器。
+  3. 确保浏览器已登录 <a href="https://www.trae.cn/dashboard" target="_blank" rel="noopener" style="color:#8ab4f8">trae.cn</a>，授权完成后凭据自动写入服务器。
 </p>
 <div class="btn-group">
   <button class="btn btn-primary" onclick="startAuth()" id="auth-btn">使用 Trae 网页授权登录</button>
-  <a class="btn btn-ghost" href="https://www.trae.cn" target="_blank" rel="noopener">访问 trae.cn</a>
+  <a class="btn btn-ghost" href="https://www.trae.cn/dashboard" target="_blank" rel="noopener">访问 trae.cn 控制台</a>
 </div>
-<div class="btn-group">
-  <a class="btn btn-secondary" href="/web/login/download" download>下载本机授权助手 web_login.py</a>
-  <a class="btn btn-ghost" href="/web/login/download?as=bat" download id="bat-link" style="display:none">下载一键启动 start_auth.bat</a>
-</div>
+<details>
+  <summary style="font-size:13px;color:#9aa0b0;cursor:pointer">下载本机授权助手（首次登录/换号才需要）</summary>
+  <div class="btn-group" style="margin-top:10px">
+    <a class="btn btn-secondary" href="/web/login/download" download>下载本机授权助手 web_login.py</a>
+    <a class="btn btn-ghost" href="/web/login/download?as=bat" download id="bat-link" style="display:none">下载一键启动 start_auth.bat</a>
+  </div>
+</details>
 <div id="loading" class="loading">等待授权中...</div>
 <div id="auth-msg" class="msg"></div>
 <hr>
@@ -977,6 +1025,9 @@ hr {{ border: none; border-top: 1px solid #2d3140; margin: 16px 0; }}
 {usage_records_html}
 </div>
 <div class="panel-card">
+<details>
+<summary style="font-size:13px;color:#9aa0b0;cursor:pointer">多账号轮询（多账号用户才需要，单账号可无视）</summary>
+<div style="margin-top:10px">
 <div class="section-title">多账号轮询</div>
 <div class="check-row">
   <input type="checkbox" id="poll-toggle" {poll_checked} onchange="togglePolling()">
@@ -992,6 +1043,8 @@ hr {{ border: none; border-top: 1px solid #2d3140; margin: 16px 0; }}
   </label>
 </div>
 <p id="poll-status" style="font-size:12px;color:#9aa0b0;margin-top:4px">当前账号数: {polling.get('account_count', 0)}，轮询: {'开' if polling.get('enabled') else '关'}</p>
+</div>
+</details>
 <hr>
 <div class="section-title">自定义 URL / 端口</div>
 <div class="form-group">
@@ -1007,14 +1060,20 @@ hr {{ border: none; border-top: 1px solid #2d3140; margin: 16px 0; }}
 </div>
 <div id="settings-msg" class="msg"></div>
 <hr>
-<div class="section-title">模型列表</div>
+<div class="section-title">模型列表 / 白名单</div>
 <div class="form-group">
-  <label>刷新 /v1/models（TRAE_FETCH_MODEL_LIST=true 时从上游拉取，否则返回内置列表）</label>
+  <label>下方为当前白名单（暴露到 /v1/models 并允许调用）。去掉勾选再保存即移出；要新增模型用底部下拉挑选后点「添加」，最后点「保存白名单」生效。</label>
 </div>
 <div class="btn-group">
   <button class="btn btn-secondary" onclick="refreshModels()">获取模型列表</button>
+  <button class="btn btn-primary" id="allowlist-save-btn" onclick="saveAllowlist()">保存白名单</button>
+  <span id="allowlist-count" style="font-size:12px;color:#9aa0b0;align-self:center"></span>
 </div>
-<pre id="models-out" style="margin-top:12px;padding:12px;background:#252836;border-radius:6px;font-size:12px;max-height:220px;overflow:auto;white-space:pre-wrap;color:#c8cbd6;display:none"></pre>
+<div id="models-out" style="margin-top:12px;padding:12px;background:#252836;border-radius:6px;font-size:13px;max-height:280px;overflow:auto;display:none"></div>
+<div class="btn-group" id="allowlist-add-row" style="margin-top:10px;display:none;align-items:center">
+  <select id="allowlist-add-select" style="padding:6px 8px;background:#252836;border:1px solid #363a4a;border-radius:6px;color:#e6e8ef;font-size:13px;max-width:320px"></select>
+  <button class="btn btn-ghost btn-sm" onclick="addAllowlistModel()">添加</button>
+</div>
 <div id="models-msg" class="msg"></div>
 </div>
 <div class="panel-card" id="conn-panel">
@@ -1133,6 +1192,10 @@ async function refreshUsage() {{
         var output=Number(record.output_tokens!==undefined?record.output_tokens:(record.completion_tokens||0));
         var total=Number(record.total_tokens!==undefined?record.total_tokens:(input+output));
         var tokenText=record.tokens_source==='unknown'?'--':(input+' / '+output+' / '+total);
+        var ttfb=record.ttfb_ms;
+        var ttfbText=(ttfb===null||ttfb===undefined||ttfb<0)?'-':(Number(ttfb)/1000).toFixed(1)+'s';
+        var durMs=record.duration_ms;
+        var durText=(durMs===null||durMs===undefined||durMs<0)?'-':(Number(durMs)/1000).toFixed(1)+'s';
         var credits=record.credits_consumed;
         var creditText=credits===null||credits===undefined?'--':Number(credits).toFixed(2);
         var source=record.credits_source||'unknown';
@@ -1143,6 +1206,8 @@ async function refreshUsage() {{
           + '<td>'+escapeHtml(when)+'</td>'
           + '<td><code>'+escapeHtml(account)+'</code></td>'
           + '<td>'+escapeHtml(model)+'</td>'
+          + '<td class="numeric">'+escapeHtml(ttfbText)+'</td>'
+          + '<td class="numeric">'+escapeHtml(durText)+'</td>'
           + '<td class="numeric">'+escapeHtml(tokenText)+'</td>'
           + '<td class="numeric" title="'+escapeHtml(source)+'">'+escapeHtml(creditText)+'</td>'
           + '<td class="usage-status"><span class="badge '+badge+'">'+escapeHtml(statusText)+'</span></td>'
@@ -1154,10 +1219,12 @@ async function refreshUsage() {{
     if(msg){{ msg.textContent=''; msg.className='msg'; }}
   }} catch(e) {{
     if(msg){{ msg.textContent=String(e); msg.className='msg msg-err'; }}
+    showToast('消费记录加载失败', String(e), false, 15000);
   }} finally {{ usageRefreshing=false; }}
 }}
 setInterval(refreshUsage, 5000);
 refreshUsage();
+silentLoadState();
 window.addEventListener('message',function(ev){{
   if (!ev.data||ev.data.type!=='trae-relay-web-login') return;
   if (state.traceId&&ev.data.loginTraceId!==state.traceId) return;
@@ -1235,6 +1302,15 @@ async function postJSON(url,payload,timeoutMs){{
 }}
 let checkinGlobalBusy=false;
 let checkinAccountBusy=new Set();
+async function silentLoadState(){{
+  try{{
+    var result=await requestJSON('/api/checkin/accounts',{{method:'GET'}},8000);
+    var d=result.data;
+    if(result.ok&&d&&d.success){{
+      (d.accounts||[]).forEach(updateAccountRow);
+    }}
+  }}catch(e){{}}
+}}
 function syncCheckinBusyUI(){{
   var anyBusy=checkinGlobalBusy||checkinAccountBusy.size>0;
   ['checkin-status-refresh-btn','credits-refresh-btn','checkin-claim-btn'].forEach(function(id){{
@@ -1248,7 +1324,7 @@ function syncCheckinBusyUI(){{
     el.classList.toggle('busy',busy);
   }});
   var indicator=document.getElementById('checkin-busy');
-  if(indicator){{ indicator.classList.toggle('visible',anyBusy); indicator.textContent=anyBusy?'正在查询/签到...':''; }}
+  if(indicator){{ indicator.classList.toggle('visible',anyBusy); indicator.textContent=anyBusy?'正在处理...':''; }}
 }}
 function setBusy(busy){{
   checkinGlobalBusy=!!busy;
@@ -1359,7 +1435,7 @@ function fillConnPreset(){{
 }}
 function connModelList(){{
   var raw = document.getElementById('conn-models').value || '';
-  var items = raw.split(/[\n,]+/).map(function(s){{ return s.trim(); }}).filter(Boolean);
+  var items = raw.split(/[\\n,]+/).map(function(s){{ return s.trim(); }}).filter(Boolean);
   return items.length ? items : CONN_PRESET.slice();
 }}
 function connModes(){{
@@ -1443,23 +1519,76 @@ async function runConnTest(){{
   var allOk = passed === jobs.length;
   showMsg('conn-msg', '测试结束：' + passed + '/' + jobs.length + ' 通过', allOk);
 }}
+var ALLOWLIST_STATE = {{ allowed: [], all: [] }};
 async function refreshModels(){{
   var el=document.getElementById('models-out');
   var msg=document.getElementById('models-msg');
+  var addRow=document.getElementById('allowlist-add-row');
   el.style.display='block';
   el.textContent='加载中...';
   try{{
-    var result=await requestJSON('/v1/models?refresh=true',{{method:'GET'}},45000);
+    var result=await requestJSON('/api/allowlist',{{method:'GET'}},45000);
     var d=result.data;
-    if(!result.ok || !d || !Array.isArray(d.data)){{
-      throw new Error((d && d.error && d.error.message) || ('HTTP '+result.status));
-    }}
-    el.textContent=d.data.map(function(model,index){{ return String(index+1).padStart(2,'0')+'  '+String(model.id||''); }}).join('\\n');
-    showMsg('models-msg','成功获取 '+d.data.length+' 个模型',true);
+    if(!result.ok || !d || !d.success){{ throw new Error((d && d.error) || ('HTTP '+result.status)); }}
+    ALLOWLIST_STATE.allowed=(d.allowed||[]).slice().sort();
+    ALLOWLIST_STATE.all=(d.all||[]).slice();
+    renderAllowlist();
+    showMsg('models-msg','当前白名单 '+ALLOWLIST_STATE.allowed.length+' 个（全量目录 '+ALLOWLIST_STATE.all.length+' 个可选）',true,6000);
   }}catch(e){{
     el.textContent=String(e);
     showMsg('models-msg',String(e),false);
   }}
+}}
+function renderAllowlist(){{
+  var el=document.getElementById('models-out');
+  var addRow=document.getElementById('allowlist-add-row');
+  if(!ALLOWLIST_STATE.allowed.length){{
+    el.innerHTML='<div style="color:#9aa0b0;padding:8px 0">白名单为空——用下方下拉添加模型后保存</div>';
+  }}else{{
+    el.innerHTML=ALLOWLIST_STATE.allowed.map(function(mid){{
+      return '<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-family:inherit">'
+        +'<input type="checkbox" class="allowlist-box" data-id="'+mid+'" onchange="updateAllowlistCount()" checked>'
+        +'<span>'+mid+'</span></label>';
+    }}).join('');
+  }}
+  updateAllowlistCount();
+  if(addRow){{
+    var sel=document.getElementById('allowlist-add-select');
+    var have={{}};ALLOWLIST_STATE.allowed.forEach(function(m){{ have[m]=true; }});
+    var rest=ALLOWLIST_STATE.all.filter(function(m){{ return !have[String(m).toLowerCase()]; }}).sort();
+    sel.innerHTML=rest.length
+      ? rest.map(function(m){{ return '<option value="'+m+'">'+m+'</option>'; }}).join('')
+      : '<option value="">（全量目录已全部加入）</option>';
+    addRow.style.display=rest.length?'flex':'none';
+  }}
+}}
+function addAllowlistModel(){{
+  var sel=document.getElementById('allowlist-add-select');
+  var mid=sel&&sel.value;
+  if(!mid){{ showMsg('models-msg','没有可添加的模型了',false,4000); return; }}
+  ALLOWLIST_STATE.allowed.push(String(mid).toLowerCase());
+  renderAllowlist();
+}}
+function updateAllowlistCount(){{
+  var boxes=document.querySelectorAll('.allowlist-box');
+  var n=0;boxes.forEach(function(b){{ if(b.checked) n++; }});
+  var el=document.getElementById('allowlist-count');
+  if(el) el.textContent='已选 '+n;
+}}
+async function saveAllowlist(){{
+  var btn=document.getElementById('allowlist-save-btn');
+  var ids=[];
+  document.querySelectorAll('.allowlist-box').forEach(function(b){{ if(b.checked) ids.push(b.getAttribute('data-id')); }});
+  if(btn) btn.disabled=true;
+  try{{
+    var d=await postJSON('/api/allowlist',{{ids:ids}},30000);
+    if(!d.success){{ throw new Error(d.error||'保存失败'); }}
+    ALLOWLIST_STATE.allowed=(d.ids||ids).slice().sort();
+    renderAllowlist();
+    showMsg('models-msg','白名单已保存：'+d.count+' 个模型，立即生效',true,6000);
+  }}catch(e){{
+    showMsg('models-msg',String(e),false);
+  }}finally{{ if(btn) btn.disabled=false; }}
 }}
 async function logout(){{
   var d=await postJSON('/api/logout',{{}});
@@ -1467,12 +1596,14 @@ async function logout(){{
   if(d.success) setTimeout(function(){{ location.reload(); }},600);
 }}
 async function switchAccount(id){{
+  var row=document.getElementById('row-'+id);
+  if(row&&row.classList.contains('active-row')){{ showMsg('account-msg','该账号已是当前账号，无需切换',true,5000); return; }}
   setSwitchBusy(true);
   try{{
     var d=await postJSON('/api/accounts/switch',{{account_id:id}},30000);
     if(!d.success){{ showMsg('account-msg',d.error||'切换失败',false); return; }}
     setActiveAccount(d.active||id,d.account||{{id:id}});
-    showMsg('account-msg','已切换到账号 '+String((d.account&&(d.account.label||d.account.user_id))||id),true,3000);
+    showMsg('account-msg','已切换到账号 '+String((d.account&&(d.account.label||d.account.user_id))||id),true,6000);
   }}finally{{ setSwitchBusy(false); }}
 }}
 async function removeAccount(id){{
@@ -1498,7 +1629,7 @@ async function saveSettings(){{
 async function checkinRefreshAll(){{
   setBusy(true);
   try{{
-    var result=await requestJSON('/api/checkin/accounts',{{method:'GET'}},90000);
+    var result=await requestJSON('/api/checkin/accounts',{{method:'GET'}},20000);
     var d=result.data;
     if(!result.ok||!d||!d.success){{ throw new Error(apiError(d,result.status)); }}
     var accounts=d.accounts||[];
@@ -1516,7 +1647,7 @@ async function checkinRefreshAll(){{
 async function creditsRefreshAll(){{
   setBusy(true);
   try{{
-    var result=await requestJSON('/api/checkin/credits/accounts',{{method:'GET'}},90000);
+    var result=await requestJSON('/api/checkin/credits/accounts',{{method:'GET'}},20000);
     var d=result.data;
     if(!result.ok||!d||!d.success){{ throw new Error(apiError(d,result.status)); }}
     var accounts=d.accounts||[];
@@ -2714,6 +2845,7 @@ class _UsageTracker:
         self.endpoint = endpoint
         self.stream = bool(stream)
         self.started = time.perf_counter()
+        self.first_token_ms: int | float | None = None
         self.usage = _usage_values({})
         self.usage_turn_id = ""
         self.saw_usage = False
@@ -2822,6 +2954,7 @@ class _UsageTracker:
             stream=self.stream,
             status=final_status,
             duration_ms=round((time.perf_counter() - self.started) * 1000, 1),
+            ttfb_ms=self.first_token_ms,
             tokens_source="upstream" if self.saw_usage else "unknown",
         )
         if explicit_credits is not None:
@@ -3100,6 +3233,10 @@ async def _tracked_stream(source, tracker: _UsageTracker):
     try:
         await tracker.begin()
         async for chunk in source:
+            if tracker.first_token_ms is None:
+                tracker.first_token_ms = round(
+                    (time.perf_counter() - tracker.started) * 1000, 1
+                )
             if not saw_terminal and _chunk_marks_terminal(chunk):
                 saw_terminal = True
             yield chunk
@@ -4315,6 +4452,7 @@ def _normalize_usage_record(record: Mapping[str, Any]) -> dict[str, Any]:
             "stream": record.get("stream") if "stream" in record else None,
             "status": str(record.get("status") or "completed"),
             "duration_ms": _number_value(record.get("duration_ms")),
+            "ttfb_ms": _number_value(record.get("ttfb_ms")),
             "timestamp": _number_value(record.get("timestamp")) or 0,
         }
     )
@@ -4373,6 +4511,7 @@ def _record_usage(
     stream: bool | None = None,
     status: str = "completed",
     duration_ms: int | float | None = None,
+    ttfb_ms: int | float | None = None,
     tokens_source: str = "upstream",
 ) -> dict[str, Any]:
     """Record one API request (newest first) and persist it independently."""
@@ -4392,6 +4531,7 @@ def _record_usage(
             "stream": stream,
             "status": status,
             "duration_ms": duration_ms,
+            "ttfb_ms": ttfb_ms,
             "timestamp": time.time(),
         }
     )
@@ -4451,6 +4591,13 @@ async def _dispatch_chat(messages, model, stream: bool, options: Optional[dict] 
         )
     if not trae_client.is_model_supported(model):
         return _openai_error(400, f"Unsupported model: {model}", "invalid_request_error", "model")
+    if MODEL_ALLOWLIST and model.strip().lower() not in MODEL_ALLOWLIST:
+        return _openai_error(
+            403,
+            f"model not allowed by TRAE_MODEL_ALLOWLIST: {model}",
+            "invalid_request_error",
+            "model",
+        )
 
     # External tools always execute on the API caller.  Web/IDE agent routes
     # may execute their own tools on the relay host, so they are never valid
@@ -4984,6 +5131,37 @@ async def status():
     }
 
 
+@app.get("/api/allowlist")
+async def api_allowlist_get():
+    try:
+        items = await trae_client.get_models(force=False)
+        all_ids = sorted({str(e.get("id", "")).strip() for e in items if e.get("id")})
+    except Exception as exc:
+        all_ids = []
+        logger.warning("allowlist fetch all ids failed: %s", exc)
+    return {
+        "success": True,
+        "all": all_ids,
+        "allowed": sorted(MODEL_ALLOWLIST),
+    }
+
+
+@app.post("/api/allowlist")
+async def api_allowlist_post(req: Request):
+    try:
+        body = await req.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "invalid JSON body"}, status_code=400)
+    ids = body.get("ids") if isinstance(body, dict) else None
+    if not isinstance(ids, list):
+        return JSONResponse({"success": False, "error": "ids array required"}, status_code=400)
+    cleaned = sorted({str(m).strip().lower() for m in ids if str(m).strip()})
+    MODEL_ALLOWLIST.clear()
+    MODEL_ALLOWLIST.update(cleaned)
+    _save_allowlist_file()
+    return {"success": True, "count": len(cleaned), "ids": cleaned}
+
+
 @app.get("/v1/models")
 async def models(request: Request):
     force = request.query_params.get("refresh", "").lower() in ("1", "true", "yes")
@@ -4991,6 +5169,17 @@ async def models(request: Request):
         items = await trae_client.get_models(force=force)
     except Exception as e:
         return _openai_error(502, str(e), "api_error")
+    if MODEL_ALLOWLIST:
+        seen = {}
+        for entry in items:
+            mid = str(entry.get("id", "")).strip()
+            key = mid.lower()
+            if key not in MODEL_ALLOWLIST:
+                continue
+            if key not in seen or mid == key:
+                # one entry per allowlist id; prefer the exact lowercase form
+                seen[key] = entry
+        items = list(seen.values())
     return {"object": "list", "data": items}
 
 

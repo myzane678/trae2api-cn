@@ -1,8 +1,24 @@
-# Trae2api-cn
+# Trae2api-cn（本地维护版）
 
-Trae CN / Trae Solo CN 模型与工具调用反代。把 Trae 终端协议包装成 OpenAI 兼容 API，支持调用方终端执行工具、多账号轮询、网页 OAuth 登录、账号并发控制和空闲会话回收。
+## 本地部署卡（2026-09-06）
+
+| 项 | 值 |
+|---|---|
+| 上游来源 | autumnsentiment/Trae2api-cn（Python/FastAPI，本地补丁见 CHANGELOG.md v1-v14） |
+| 服务地址 | `http://127.0.0.1:8092/v1`（OpenAI Chat Completions 兼容 + Codex Responses API） |
+| 鉴权 | `Authorization: Bearer sk-trae-6a056f59f298f35f69f01772515f3316` |
+| 控制台 | `http://127.0.0.1:8092/web/login`（账号/积分/签到/白名单勾选/消费记录含首字耗时） |
+| 启停 | `start-trae2api.cmd`（8092 + 8765 助手）/ `stop-trae2api.cmd`，无窗口自关 |
+| 登录 | 控制台授权按钮（或 `start-trae2api-login.cmd` 先行）；token 自动续期 |
+| 白名单 | `TRAE_MODEL_ALLOWLIST`（.env）+ 控制台勾选管理（data/model-allowlist.json 优先），现 14 个 |
+| 积分 | 总 4650（通用 2650 + Work 专属 2000），每日签到 |
+| 工具调用 | ✅ 协议闭环已验证；**但 remote 模式下模型在字节云沙箱，不能执行本地工具** |
+| 上游模式 | `UPSTREAM_MODE=remote`（定稿）；raw 直连网关故障中（app config record not found），恢复后可重评估 |
+| 已知问题 | auto 模型不可用；remote 池对免费账号有模型限制（间歇）；raw 恢复前 TRAE 渠道仅作纯文本模型使用 |
 
 **仅供学习使用。请勿用于商业用途。**
+
+> 以下为上游原 README。
 
 ## 特点
 
