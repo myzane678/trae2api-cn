@@ -1,5 +1,12 @@
 # CHANGELOG — trae2api-cn
 
+## v18 (2026-09-07)：修复非流式路径丢弃 finish summary 工具块 + 真实端到端验证通过
+- **Bug 根因**：`collect_nonstream_web` 在第 2143 行先执行 `_ensure_required_tool_call`，之后（第 2156 行）才从 `final_summary` 提取工具调用。当上游把模型的 `<opencode_tool_call>` 块放进 finish 项 `params.summary`（实测上游行为：thought 增量快照在块中途结束，完整块由 finish summary 返回）时，required 模式下必然在提取前就报错。流式版 `translate_web_events` 顺序正确，不受影响。
+- **修复**：把 required 检查移到 summary 工具调用提取之后，与流式版对齐；新增回归测试 `test_required_tool_call_in_finish_summary_is_not_dropped`（先红灯复现、修复后转绿）。
+- **真实端到端验证（glm-5.3，单次请求）**：虚拟 `get_weather` + `tool_choice=required` → 上游 Agent 会话创建成功 → 模型输出协议块 → relay 返回 HTTP 200、`finish_reason=tool_calls`、`tool_calls[0].function.name=get_weather`、参数 JSON 正确。此前三次"失败"均为该 relay bug，并非模型不配合。
+- 已知次要问题：模型在 thought 里的协议复述旁白会随 content 一并返回（不影响 tool_calls 正确性）；后续可按需收紧旁白过滤。
+- 全量回归：`tests.test_sse` + `tests.test_raw_client` 共 129 个测试通过。
+
 ## v17 (2026-09-07)：Remote 文本工具提示桥
 - 新增默认关闭的 `TRAE_REMOTE_PROMPT_TOOLS_ENABLED`：不把 `tools`、MCP、Work 云端环境字段作为可执行工具发送给上游，只把调用方工具目录写入文本提示，复用现有文本/XML 工具调用解析器转换为 OpenAI `tool_calls`。
 - 工具提示明确要求模型只请求调用方本地工具、不得声称执行或生成工具结果；工具名、参数 JSON 和 `role=tool` 续轮仍由调用方/relay 校验。

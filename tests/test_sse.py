@@ -1907,6 +1907,81 @@ class WebEventTests(unittest.TestCase):
         self.assertEqual(choice["message"]["content"], "done")
         self.assertNotIn("tool_calls", choice["message"])
 
+    def test_required_tool_call_in_finish_summary_is_not_dropped(self):
+        """A tool block inside the finish summary must survive tool_choice=required.
+
+        The upstream prompt bridge receives the model's protocol block back via
+        the finish item's ``params.summary`` after the incremental ``thought``
+        snapshots end mid-block. The non-stream collector must extract summary
+        calls before enforcing the required-tool error.
+        """
+
+        complete_block = (
+            '<opencode_tool_call>{"id":"call_test_1","name":"get_weather",'
+            '"input":{"city":"Beijing","unit":"celsius"}}</opencode_tool_call>'
+        )
+        plan_id = "6a9e9e7a422cfa04f5f06245"
+
+        async def events():
+            for _ in range(6):
+                yield "plan_item", {
+                    "id": plan_id,
+                    "thought": "",
+                    "tool_call_info": {"id": plan_id, "name": "", "params": None},
+                }
+            yield "plan_item", {
+                "id": plan_id,
+                "thought": '<opencode_tool_call>{"id":"call_test_1","name":"get_weather",'
+                '"input":{"city":"Beijing","',
+                "tool_call_info": {"id": plan_id, "name": "", "params": None},
+            }
+            yield "plan_item", {
+                "id": plan_id,
+                "tool_call_info": {
+                    "id": plan_id,
+                    "name": "finish",
+                    "params": {"summary": complete_block},
+                    "result": {"status": "success"},
+                },
+            }
+            yield "done", {"status": "succeeded"}
+
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "city": {"type": "string"},
+                            "unit": {"type": "string"},
+                        },
+                        "required": ["city", "unit"],
+                    },
+                },
+            }
+        ]
+        result = asyncio.run(
+            sse.collect_nonstream_web(
+                events(),
+                "m",
+                allowed_tools=tools,
+                tool_choice="required",
+                parallel_tool_calls=False,
+                fail_on_empty=True,
+            )
+        )
+        choice = result["choices"][0]
+        self.assertEqual(choice["finish_reason"], "tool_calls")
+        call = choice["message"]["tool_calls"][0]
+        self.assertEqual(call["function"]["name"], "get_weather")
+        self.assertEqual(
+            json.loads(call["function"]["arguments"]),
+            {"city": "Beijing", "unit": "celsius"},
+        )
+        self.assertIsNone(choice["message"]["content"])
+
     def test_plan_thought_tool_block_is_translated_to_client_call(self):
         block = (
             '<opencode_tool_call>{"id":"call_dl_1","name":"download",'

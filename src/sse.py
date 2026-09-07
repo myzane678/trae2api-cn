@@ -2140,7 +2140,6 @@ async def collect_nonstream_web(
             break
     if error_event:
         raise RuntimeError(f"trae {error_event.get('code','')}: {error_event.get('message','')}")
-    _ensure_required_tool_call(tool_choice, tool_calls.has_calls)
     content = "".join(thoughts.get(item, "") for item in order)
     if not content.strip():
         # Every plan item was pure narration. Returning it is better than
@@ -2174,6 +2173,11 @@ async def collect_nonstream_web(
         final_summary = filtered_summary or (
             summary_text if not any(thoughts.values()) else ""
         )
+    # Enforce required-tool-choice only after summary calls have been
+    # extracted. The upstream prompt bridge returns the model's tool block via
+    # the finish item's ``params.summary``, so checking earlier would raise
+    # before those calls were ever collected (mirrors translate_web_events).
+    _ensure_required_tool_call(tool_choice, tool_calls.has_calls)
     if not tool_calls.has_calls:
         if not content:
             content = final_summary
