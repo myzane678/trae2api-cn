@@ -12,8 +12,8 @@
 | 登录 | 控制台授权按钮（或 `start-trae2api-login.cmd` 先行）；token 自动续期 |
 | 白名单 | `TRAE_MODEL_ALLOWLIST`（.env）+ 控制台勾选管理（data/model-allowlist.json 优先），现 14 个 |
 | 积分 | 总 4650（通用 2650 + Work 专属 2000），每日签到 |
-| 工具调用 | ✅ 协议闭环已验证；**但 remote 模式下模型在字节云沙箱，不能执行本地工具** |
-| 上游模式 | `UPSTREAM_MODE=remote`（定稿）；raw 直连网关故障中（app config record not found），恢复后可重评估 |
+| 工具调用 | ✅ 可选让带工具请求走 `llm_utils_chat + solo_work_lite`，返回结构化 `tool_calls`，由调用方本地执行；默认保持现有 remote |
+| 上游模式 | `UPSTREAM_MODE=remote`；工具灰度默认关闭，设置 `TRAE_SOLO_TOOLS_ENABLED=true` 开启；失败不回退，需显式 `TRAE_SOLO_TOOLS_FALLBACK_REMOTE=true`；raw 仍是研究路径 |
 | 已知问题 | auto 模型不可用；remote 池对免费账号有模型限制（间歇）；raw 恢复前 TRAE 渠道仅作纯文本模型使用 |
 
 **仅供学习使用。请勿用于商业用途。**

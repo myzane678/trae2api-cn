@@ -1,5 +1,12 @@
 # CHANGELOG — trae2api-cn
 
+## v15 (2026-09-07)：工具请求灰度接入 SOLO 原生 tool_calls
+- 新增 `llm_utils_chat + function=solo_work_lite` 通道：带 `tools` / 工具续轮历史的请求优先走 SOLO；普通请求继续走既有 remote。
+- OpenAI 工具 schema 转为 Trae 格式：`parameters` 序列化为 JSON 字符串，assistant `tool_calls[].function` 转为上游 `function_call`；SSE 继续复用现有 OpenAI tool-call 翻译器。
+- 默认关闭灰度路由；设置 `TRAE_SOLO_TOOLS_ENABLED=true` 后才让工具请求走 SOLO；`TRAE_SOLO_TOOLS_FALLBACK_REMOTE=true` 才允许失败后回退 remote，默认不回退以避免云端沙箱伪造本地工具结果。
+- 当前 `.env` 未切换，普通请求仍为 `UPSTREAM_MODE=remote`；raw 仍保持关闭/研究状态。
+- 离线验证：SOLO body 协议测试、工具路由隔离测试、显式回退测试、Python 编译通过；恢复 `star` 账号后受控真实请求已认证通过，但 `glm-5.3` 与 `deepseek-v4-flash` 均返回上游 `param is invalid`，灰度保持关闭，未继续探针。
+
 ## 通道诊断记录 (2026-09-06 晚)：raw 网关故障，锁定 remote
 - 现象：DSH 调 qwen3.8-max 间歇报 `remote: Trae remote model is not available for the bound account`
 - 实验：UPSTREAM_MODE=auto（raw）→ 连 glm-5.3 都报 `failed to get app config: record not found`（raw 网关 llm_raw_chat 当天故障/变更）；切回 remote → glm-5.3 ✅ 21.8s、qwen3.8-max ✅ 17.1s
