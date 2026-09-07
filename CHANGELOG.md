@@ -1,5 +1,31 @@
 # CHANGELOG — trae2api-cn
 
+## 实验结论记录 (2026-09-07)：提示词桥实战不可用（tool_choice=auto 下模型遵循率≈0）
+
+- **触发**：丞相在 DSH 用 trae provider 真实对话后指出「模型不会听话的输出工具格式」。会话日志取证确认。
+- **取证**（DSH 会话 `975b5631-86ea-4d66-b67a-a1822c71b2d4`，provider=trae）：5 次真实轮次每次都带 tools=151（DSH 不发 tool_choice，即 auto）；relay 日志 5 次桥接全部激活（req-f962e688 / a568bd43 / d16591e72 / 5f7f19f4 / 1e43edd3），结果 **全部 `tool_chunks=0`**——模型直接文字回答，一次都没输出 `<opencode_tool_call>` 协议块。
+- **对比 v18 通过场景**：`tool_choice=required` + 消息里明确点名工具 → 模型服从。即桥只在**调用方显式强制**时可用；自然对话（auto）下不可用。
+- **根因**：Trae 上游 Agent 模型有自己的系统提示词，权重远大于注入的文本工具协议；无 tool_choice 硬约束时模型按「直接回答」行为走。151 工具 schema 实测注入约 79K 字符 query，也加剧忽略。
+- **结论与定位**：
+  - 技术链路本身通（tools → 提示词注入 → 协议块解析 → OpenAI tool_calls），失败在模型遵循环节，非 relay bug；
+  - TRAE 渠道（8092）对 DSH 的**实际定位 = 纯文本模型**；本地工具/agent 任务走 zcode (8090) / workbuddy (8091)；
+  - 桥保持默认开启无害（纯文本请求不受影响；若调用方自己发 `tool_choice=required` 仍可工作），不做「全量强制 required」——那会导致纯聊天也瞎调工具；
+  - `TRAE_RAW_MAX_TOOL_SCHEMA_CHARS=100000` 已按丞相指示调整（.env），但预算问题不是本次失败的主因。
+- **不再继续的方向**：向上游探针 Work tier 工具、更复杂的提示词工程对抗 Agent 系统提示词。此为上游产品形态限制。
+
+## v22 (2026-09-07)：修复控制台 JS 崩溃（f-string 内 JS 字符串换行转义）
+
+- **症状**：控制台所有按钮（停止服务/登出/签到…）点击无反应。
+- **根因**：`_web_login_html` 是 Python f-string 模板，v21 新增的 `stopService` 里
+  `confirm('…\n\n…')` 写成单 `\n`——Python 把它渲染成真实换行符，JS 单引号字符串跨行 →
+  `Uncaught SyntaxError`，整个 `<script>` 失效，所有 onclick 全部按不动。
+- **修复**：f-string 内的 JS 字符串换行必须写 `\\n`（双反斜杠），渲染后 JS 才得到 `\n` 转义。
+  本文件其余 JS 的 `\n` 均为 `\\n`，只有新加段落踩坑。
+- **验证**：渲染后 HTML 中 `stopService` 的 confirm 为单行 `\n` 字面；浏览器实测无
+  SyntaxError，`stopService`/`logout`/`checkinRefreshAll` 全部定义；8092/8765 健康。
+- ⚠️ 教训（第 2 次踩此坑）：**给 main.py 内嵌 JS 加字符串时必须用 `\\n`，不要在 f-string
+  里写裸 `\n`**；改动后务必浏览器开控制台确认无红色语法错误。
+
 ## v21 (2026-09-07)：控制台新增「停止服务」按钮
 
 - **新增 `POST /api/stop`**：调用 `stop-trae2api-helper.ps1`（杀 8092 relay + 8765 OAuth login helper），

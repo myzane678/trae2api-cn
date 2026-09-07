@@ -1596,7 +1596,7 @@ async function logout(){{
   if(d.success) setTimeout(function(){{ location.reload(); }},600);
 }}
 async function stopService(){{
-  if(!confirm('确定要停止 Trae CN Relay 服务吗？\n\n停止后需手动运行 start-trae2api.cmd 重新启动。')) return;
+  if(!confirm('确定要停止 Trae CN Relay 服务吗？\\n\\n停止后需手动运行 start-trae2api.cmd 重新启动。')) return;
   try{{
     var d=await postJSON('/api/stop',{{}});
     if(d&&d.ok) showMsg('auth-msg','正在停止服务…请用 start-trae2api.cmd 手动恢复',true,8000);
