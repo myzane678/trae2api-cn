@@ -1,5 +1,11 @@
 # CHANGELOG — trae2api-cn
 
+## v19 (2026-09-07)：删除 solo_work_lite 死代码 + 提示词桥默认开启
+- 删除 v15 遗留的 SOLO Lite 工具通道代码：`_solo_messages`、`_solo_tools`、`resolve_solo_model`、`build_solo_chat_body`、`send_solo_chat_request`（trae_client.py）、`run_solo_chat` + dispatch solo 分支（main.py）、3 个对应测试（test_main_smoke.py）。
+- 不动的：`trae_decrypt` 里的 SOLO CN 桌面登录态探测（auth 功能）、`remote_agent_type` 里的 `solo_work_lite` 别名归一（tier 映射）、`traework_native_bridge` 里的 solo_lite 原生桥设置。
+- `.env` 新增 `TRAE_REMOTE_PROMPT_TOOLS_ENABLED=true`：v18 端到端验证通过后，提示词桥改为生产默认开启。带 tools 请求 → Agent tier + 提示词桥；不带 tools → Agent tier 纯文本。旧「强制 Work → 500」路径退出默认。
+- README 部署卡同步更新。CHANGELOG 保留 v15 试错记录。
+
 ## v18 (2026-09-07)：修复非流式路径丢弃 finish summary 工具块 + 真实端到端验证通过
 - **Bug 根因**：`collect_nonstream_web` 在第 2143 行先执行 `_ensure_required_tool_call`，之后（第 2156 行）才从 `final_summary` 提取工具调用。当上游把模型的 `<opencode_tool_call>` 块放进 finish 项 `params.summary`（实测上游行为：thought 增量快照在块中途结束，完整块由 finish summary 返回）时，required 模式下必然在提取前就报错。流式版 `translate_web_events` 顺序正确，不受影响。
 - **修复**：把 required 检查移到 summary 工具调用提取之后，与流式版对齐；新增回归测试 `test_required_tool_call_in_finish_summary_is_not_dropped`（先红灯复现、修复后转绿）。

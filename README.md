@@ -12,8 +12,8 @@
 | 登录 | 控制台授权按钮（或 `start-trae2api-login.cmd` 先行）；token 自动续期 |
 | 白名单 | `TRAE_MODEL_ALLOWLIST`（.env）+ 控制台勾选管理（data/model-allowlist.json 优先），现 14 个 |
 | 积分 | 总 4650（通用 2650 + Work 专属 2000），每日签到 |
-| 工具调用 | ✅ 可选使用 Remote 文本提示桥：调用方 tools 注入提示词，模型输出文本 tool call，再由 relay 转为 OpenAI `tool_calls`；工具仍由调用方本地执行 |
-| 上游模式 | `UPSTREAM_MODE=remote`；`TRAE_REMOTE_PROMPT_TOOLS_ENABLED=false` 默认关闭；旧 SOLO 灰度已废弃；raw 仍是研究路径 |
+| 工具调用 | ✅ Remote 文本提示桥（默认开启）：调用方 tools 注入提示词，模型输出文本 tool call，relay 转为 OpenAI `tool_calls`；工具由调用方本地执行，glm-5.3 已端到端验证 |
+| 上游模式 | `UPSTREAM_MODE=remote`；`TRAE_REMOTE_PROMPT_TOOLS_ENABLED=true` 默认开启（v18 验证后）；旧 SOLO Lite 代码已删除；raw 仍是研究路径 |
 | 已知问题 | auto 模型不可用；remote 池对免费账号有模型限制（间歇）；raw 恢复前 TRAE 渠道仅作纯文本模型使用 |
 
 **仅供学习使用。请勿用于商业用途。**

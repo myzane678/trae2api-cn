@@ -4025,52 +4025,6 @@ async def run_traework_native_chat(
         native_resp.close()
 
 
-async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] = None):
-    """SOLO llm_utils_chat stream with caller-owned tool translation."""
-    options = dict(options or {})
-    solo_resp = await trae_client.send_solo_chat_request(messages, model, options)
-    translation_options = _tool_translation_options(options, messages)
-    upstream_metadata: dict[str, Any] = {}
-    try:
-        if stream:
-            async def gen():
-                try:
-                    async for chunk in translate_ide_stream(
-                        solo_resp.response,
-                        model,
-                        FORWARD_USAGE,
-                        fail_on_empty=True,
-                        require_terminal=True,
-                        upstream_metadata=upstream_metadata,
-                        **translation_options,
-                    ):
-                        _bind_usage_turn_from_metadata(upstream_metadata)
-                        _track_usage_from_chunk(chunk, model)
-                        yield chunk
-                finally:
-                    _bind_usage_turn_from_metadata(upstream_metadata)
-                    solo_resp.close()
-
-            return StreamingResponse(
-                gen(), media_type="text/event-stream", headers=_sse_headers()
-            )
-        result = await collect_nonstream_ide(
-            solo_resp.response,
-            model,
-            fail_on_empty=True,
-            require_terminal=True,
-            upstream_metadata=upstream_metadata,
-            **translation_options,
-        )
-        _bind_usage_turn_from_metadata(upstream_metadata)
-        _track_usage_from_result(result, model)
-        return JSONResponse(content=result)
-    finally:
-        if not stream:
-            _bind_usage_turn_from_metadata(upstream_metadata)
-            solo_resp.close()
-
-
 async def run_raw_chat(messages, model, stream: bool, options: Optional[dict] = None):
     """直连 Trae 原生 chat 协议，响应暂复用 IDE SSE 翻译器。"""
     logger.info(
@@ -4657,34 +4611,13 @@ async def _dispatch_chat(messages, model, stream: bool, options: Optional[dict] 
         options = dict(options)
         options["_prompt_tool_bridge"] = True
         logger.info("remote prompt-tool bridge enabled id=%s model=%s", str(options.get("_relay_request_id") or ""), model)
-    solo_tools_enabled = os.environ.get("TRAE_SOLO_TOOLS_ENABLED", "false").strip().lower() in {
-        "1", "true", "yes", "on"
-    }
     if tool_protocol_requested:
         logger.info(
-            "dispatch tool protocol id=%s mode=%s model=%s solo_enabled=%s",
+            "dispatch tool protocol id=%s mode=%s model=%s",
             str(options.get("_relay_request_id") or ""),
             UPSTREAM_MODE,
             model,
-            solo_tools_enabled,
         )
-        if solo_tools_enabled:
-            try:
-                return await run_solo_chat(messages, model, stream, options)
-            except Exception as exc:
-                allow_fallback = os.environ.get(
-                    "TRAE_SOLO_TOOLS_FALLBACK_REMOTE", "false"
-                ).strip().lower() in {"1", "true", "yes", "on"}
-                if not allow_fallback:
-                    logger.warning("solo tool route failed without fallback: %s", exc)
-                    return _openai_error(
-                        502,
-                        f"solo tool route failed: {exc}",
-                        "upstream_error",
-                    )
-                logger.warning(
-                    "solo tool route failed; explicit remote fallback enabled: %s", exc
-                )
 
     # Raw v2 is the default for every model. Operators can opt specific models
     # (or ``*``) into the account-bound remote executor for diagnostics.
