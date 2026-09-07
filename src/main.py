@@ -317,9 +317,8 @@ PUBLIC_PATHS = {
     "/api/usage/last",
     "/api/usage/records",
     "/api/allowlist",
-    # Dashboard-only diagnostic, grouped with the other local console
-    # endpoints. It sends a fixed one-line probe and returns no credential.
     "/api/model-test",
+    "/api/stop",
 }
 PUBLIC_PATH_PREFIXES = ("/api/checkin", "/api/accounts")
 WEB_LOGIN_SCRIPT = Path(__file__).resolve().parent.parent / "web_login.py"
@@ -820,6 +819,7 @@ def _web_login_html() -> str:
     logout_btn = ''
     if state.token:
         logout_btn = '<button class="btn btn-ghost btn-sm" onclick="logout()">登出</button>'
+    stop_btn = '<button class="btn btn-danger btn-sm" onclick="stopService()" title="停止 Trae CN Relay 服务（需手动运行 start-trae2api.cmd 恢复）">停止服务</button>'
 
     settings_web = settings.get("web_base_url") or WEB_BASE
     settings_port = settings.get("relay_port") or PORT
@@ -962,7 +962,7 @@ hr {{ border: none; border-top: 1px solid #2d3140; margin: 16px 0; }}
 <h1>Trae CN Relay 控制台</h1>
 <div class="status-row" style="justify-content:space-between;align-items:center">
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">{status_html}</div>
-  {logout_btn}
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">{stop_btn}{logout_btn}</div>
 </div>
 <hr>
 <div class="panel-grid">
@@ -1594,6 +1594,16 @@ async function logout(){{
   var d=await postJSON('/api/logout',{{}});
   showMsg('auth-msg',d.success?'已登出':(d.error||'登出失败'),d.success);
   if(d.success) setTimeout(function(){{ location.reload(); }},600);
+}}
+async function stopService(){{
+  if(!confirm('确定要停止 Trae CN Relay 服务吗？\n\n停止后需手动运行 start-trae2api.cmd 重新启动。')) return;
+  try{{
+    var d=await postJSON('/api/stop',{{}});
+    if(d&&d.ok) showMsg('auth-msg','正在停止服务…请用 start-trae2api.cmd 手动恢复',true,8000);
+    else showMsg('auth-msg',(d&&d.error)||'停止失败',false);
+  }}catch(e){{
+    showMsg('auth-msg',String(e),false);
+  }}
 }}
 async function switchAccount(id){{
   var row=document.getElementById('row-'+id);
@@ -6317,6 +6327,43 @@ async def api_checkin_claim():
 async def api_logout():
     auth.logout_active()
     return JSONResponse({"success": True})
+
+
+@app.post("/api/stop")
+async def api_stop():
+    """调用本机停止脚本（杀 relay 与 OAuth login helper），本进程随之退出。
+
+    脚本路径默认相对 cwd 的 stop-trae2api-helper.ps1，可用 TRAE_STOP_SCRIPT 覆盖。
+    延迟执行以保证响应先返回浏览器；服务停止后需手动运行 start-trae2api.cmd。
+    """
+    script = os.environ.get("TRAE_STOP_SCRIPT", "stop-trae2api-helper.ps1")
+    if not os.path.isfile(script):
+        return JSONResponse(
+            {"ok": False, "error": f"stop script not found: {script}"},
+            status_code=500,
+        )
+
+    async def _run_stop():
+        await asyncio.sleep(0.5)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                script,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await proc.wait()
+        except Exception as exc:  # best-effort shutdown
+            logger.warning("stop script failed: %s", exc)
+
+    asyncio.create_task(_run_stop())
+    return JSONResponse(
+        {"ok": True, "msg": f"正在停止服务（{script}），如未停止请手动运行 stop-trae2api.cmd"}
+    )
 
 
 @app.get("/api/accounts")

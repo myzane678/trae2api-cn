@@ -1,5 +1,15 @@
 # CHANGELOG — trae2api-cn
 
+## v21 (2026-09-07)：控制台新增「停止服务」按钮
+
+- **新增 `POST /api/stop`**：调用 `stop-trae2api-helper.ps1`（杀 8092 relay + 8765 OAuth login helper），
+  本进程随之退出；停止后需手动运行 `start-trae2api.cmd`。脚本路径默认相对 cwd，
+  可用 `TRAE_STOP_SCRIPT` 覆盖；加入 `PUBLIC_PATHS`（控制台免鉴权可调）。
+- 控制台顶部状态栏右侧新增「停止服务」danger 按钮（与「删除账号」同款 `.btn-danger` 样式），
+  点击先 `confirm` 确认再调用；500ms 延迟执行以保证响应先返回浏览器。
+- 新增 `tests/test_stop_api.py`（脚本缺失 → 500 且不执行，安全路径）。
+- 全量回归：pytest 402 passed。
+
 ## v20 (2026-09-07)：测试环境隔离 + _FakeUsageTracker 同步
 
 - **修复 `_tracked_stream` 测试脱节**：v18（d0e2e39）给 `_tracked_stream` 增加了 `tracker.first_token_ms` / `tracker.started` 读取（TTFB 统计），但 tests 的 `_FakeUsageTracker` 未同步 → 首帧即 `AttributeError`，`UsageStreamTerminalTests` 4 个用例稳定超时。已补齐两个字段。
