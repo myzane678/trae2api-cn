@@ -926,6 +926,7 @@ def _messages_with_client_runtime(
         raw_client.build_client_context(options),
         options.get("tool_choice"),
         options.get("parallel_tool_calls"),
+        prompt_bridge=options.get("_prompt_tool_bridge") is True,
     )
     return [{"role": "system", "content": prompt}, *messages]
 

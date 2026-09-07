@@ -806,8 +806,9 @@ def build_runtime_system_prompt(
     parallel_tool_calls: Any = None,
     *,
     native_tools: bool = False,
+    prompt_bridge: bool = False,
 ) -> str:
-    """Describe the caller-owned tool runtime and schemas to the raw model."""
+    """Describe caller-owned tools to a text-only or native upstream model."""
 
     tool_defs = _normalized_tools(tools)
     context = dict(client_context)
@@ -832,6 +833,14 @@ def build_runtime_system_prompt(
         'Replace "<unique-id>" with a new identifier for every call; never reuse an id across calls.',
         "Fill input according to the selected tool schema and wait for the client result before continuing.",
     ]
+    if prompt_bridge:
+        lines.extend([
+            "This is a text-only model bridge. You have no executable tools and must never use or describe server-side tools.",
+            "All tools listed below belong to the caller's local machine; only request them, never claim to have executed them.",
+            'Use the local_tool_call protocol name only as the semantic intent; encode each request in the exact opencode_tool_call block below.',
+            'The only accepted request format is exactly one <opencode_tool_call>{"id":"<unique-id>","name":"tool_name","input":{}}</opencode_tool_call> block with no other text.',
+            "Never emit a tool result, file content, command output, or success claim yourself.",
+        ])
     if tool_defs and not native_tools:
         tool_payload, compacted, omitted_signatures = _tool_definitions_prompt(
             tool_defs

@@ -3453,6 +3453,7 @@ async def run_remote_session(messages, model, stream: bool, options: Optional[di
     )
     if (
         caller_tools_use_work
+        and not bool(options.get("_prompt_tool_bridge"))
         and _tool_protocol_requested(options, messages)
         and not remote_options.get("_remote_agent_type")
         and not remote_options.get("remote_agent_type")
@@ -4645,9 +4646,17 @@ async def _dispatch_chat(messages, model, stream: bool, options: Optional[dict] 
             "model",
         )
 
-    # External tools always execute on the API caller.  The SOLO endpoint is
-    # the only production path here with native structured tool-call events.
+    # External tools always execute on the API caller.  A text prompt bridge is
+    # opt-in: the upstream receives only a tool catalog in text, never executable
+    # tool fields or cloud-workspace permissions.
     tool_protocol_requested = _tool_protocol_requested(options, messages)
+    prompt_tools_enabled = os.environ.get(
+        "TRAE_REMOTE_PROMPT_TOOLS_ENABLED", "false"
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    if tool_protocol_requested and prompt_tools_enabled:
+        options = dict(options)
+        options["_prompt_tool_bridge"] = True
+        logger.info("remote prompt-tool bridge enabled id=%s model=%s", str(options.get("_relay_request_id") or ""), model)
     solo_tools_enabled = os.environ.get("TRAE_SOLO_TOOLS_ENABLED", "false").strip().lower() in {
         "1", "true", "yes", "on"
     }

@@ -1,5 +1,11 @@
 # CHANGELOG — trae2api-cn
 
+## v17 (2026-09-07)：Remote 文本工具提示桥
+- 新增默认关闭的 `TRAE_REMOTE_PROMPT_TOOLS_ENABLED`：不把 `tools`、MCP、Work 云端环境字段作为可执行工具发送给上游，只把调用方工具目录写入文本提示，复用现有文本/XML 工具调用解析器转换为 OpenAI `tool_calls`。
+- 工具提示明确要求模型只请求调用方本地工具、不得声称执行或生成工具结果；工具名、参数 JSON 和 `role=tool` 续轮仍由调用方/relay 校验。
+- 旧 `solo_work_lite` 和 TraeCode CLI ACP 路线不再作为生产候选；普通 remote 文本链路保持不变。Remote 云端隐藏工具无法仅靠提示词做绝对禁止，因此默认关闭并保留安全边界。
+- A 盘 `A:\\DevTools\\trae-cli` 安装与临时探测文件已清理；未修改现有 Trae 登录态。
+
 ## v16 (2026-09-07)：官方 TraeCode CLI ACP 安全探测
 - 按官方 Windows 安装脚本审查后，未执行其硬编码 `%LOCALAPPDATA%\\trae-cli` 安装流程；从官方 CDN 下载 `trae-cli_0.120.52_windows_amd64.zip`，手动安装到 `A:\\DevTools\\trae-cli\\bin`，未修改用户 PATH、未覆盖 `C:\\Users\\huang\\.trae-cn`。
 - 验证：`traecli --version` 为 `0.120.52`；`traecli acp serve --help` 正常；ACP `initialize` 与 `session/new` 均成功，声明 `loadSession`、MCP HTTP/SSE 和 `default/bypass_permissions/plan` 模式。

@@ -91,6 +91,18 @@ class RawClientBuildTests(unittest.TestCase):
         self.assertIn("cannot write into the caller workspace", prompt)
         self.assertIn("matching client tool result", prompt)
 
+    def test_prompt_bridge_forbids_server_tools_and_requires_local_protocol(self):
+        prompt = raw_client.build_runtime_system_prompt(
+            [{"type": "function", "function": {"name": "read_file", "parameters": {"type": "object"}}}],
+            {"workspace_path": r"A:\workspace"},
+            tool_choice="required",
+            prompt_bridge=True,
+        )
+        self.assertIn("text-only model bridge", prompt)
+        self.assertIn("never use or describe server-side tools", prompt)
+        self.assertIn("local_tool_call", prompt)
+        self.assertIn("read_file", prompt)
+
     def test_compacted_catalog_prioritizes_namespaced_exec_and_download(self):
         tools = []
         for index in range(100):
