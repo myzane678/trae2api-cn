@@ -1449,6 +1449,24 @@ def _solo_tools(tools: Any) -> list[dict]:
     return result
 
 
+def resolve_solo_model(model: str, options: Optional[dict] = None) -> tuple[str, str]:
+    """Resolve a public model to the current SOLO config/model pair."""
+    options = options or {}
+    configured = str(options.get("solo_model") or os.environ.get("TRAE_SOLO_MODEL") or "").strip()
+    requested = configured or str(model or "").strip()
+    aliases = {
+        "auto": ("glm-5-turbo", "glm-5-turbo__dev"),
+        "glm-5.3": ("glm-5-turbo", "glm-5-turbo__dev"),
+        "deepseek-v4-flash": ("glm-5-turbo", "glm-5-turbo__dev"),
+        "deepseek-v4-flash-official": ("glm-5-turbo", "glm-5-turbo__dev"),
+    }
+    key = requested.lower()
+    if key in aliases:
+        return aliases[key]
+    config_name = convert_model_name(requested) or "glm-5-turbo"
+    return config_name, str(options.get("solo_wire_model") or config_name)
+
+
 def build_solo_chat_body(
     messages: list[dict],
     model: str,
@@ -1462,14 +1480,14 @@ def build_solo_chat_body(
 ) -> dict:
     """Build the current SOLO ``llm_utils_chat`` request body."""
     options = options or {}
-    resolved_model = convert_model_name(model) or "glm-5.2"
+    resolved_model, wire_model = resolve_solo_model(model, options)
     session_id = session_id or _requested_session_id(options) or str(uuid.uuid4())
     body: dict[str, Any] = {
         "messages": _solo_messages(messages),
         "function": str(options.get("solo_function") or "solo_work_lite"),
         "stream": True,
         "config_name": resolved_model,
-        "model": resolved_model,
+        "model": wire_model,
     }
     normalized_tools = _solo_tools(tools)
     if normalized_tools and str(tool_choice).lower() != "none":

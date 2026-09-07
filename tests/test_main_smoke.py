@@ -1931,8 +1931,8 @@ class MainCliSmokeTests(unittest.TestCase):
         )
 
         self.assertEqual(body["function"], "solo_work_lite")
-        self.assertEqual(body["config_name"], "glm-5.3")
-        self.assertEqual(body["model"], "glm-5.3")
+        self.assertEqual(body["config_name"], "glm-5-turbo")
+        self.assertEqual(body["model"], "glm-5-turbo__dev")
         self.assertTrue(body["stream"])
         self.assertNotIn("parallel_tool_calls", body)
         self.assertEqual(body["messages"][0]["content"], [{"type": "text", "text": "读取 README.md"}])

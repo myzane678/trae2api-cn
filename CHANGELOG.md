@@ -4,7 +4,8 @@
 - 新增 `llm_utils_chat + function=solo_work_lite` 通道：带 `tools` / 工具续轮历史的请求优先走 SOLO；普通请求继续走既有 remote。
 - OpenAI 工具 schema 转为 Trae 格式：`parameters` 序列化为 JSON 字符串，assistant `tool_calls[].function` 转为上游 `function_call`；SSE 继续复用现有 OpenAI tool-call 翻译器。
 - 默认关闭灰度路由；设置 `TRAE_SOLO_TOOLS_ENABLED=true` 后才让工具请求走 SOLO；`TRAE_SOLO_TOOLS_FALLBACK_REMOTE=true` 才允许失败后回退 remote，默认不回退以避免云端沙箱伪造本地工具结果。
-- 当前 `.env` 未切换，普通请求仍为 `UPSTREAM_MODE=remote`；raw 仍保持关闭/研究状态。
+- 当前 `.env` 未切换，普通请求仍为 `UPSTREAM_MODE=remote`；raw 仍保持关闭/研究状态。只读 `get_detail_param(function=solo_work_lite)` 后确认当前 star 账号可用 wire 配置为 `glm-5-turbo` + `glm-5-turbo__dev`，不支持此前测试的 glm-5.3/deepseek-v4-flash；SOLO 路由现按账号可用别名映射，仍默认关闭。
+- 进一步真实验证：SOLO 已认证，但上游实际 provider 选成 `glm-5.2`，与 detail 返回的 `glm-5-turbo__dev` 不一致，说明还缺少账号绑定的 SOLO model detail/encrypted 参数；未继续猜测或探针，灰度保持关闭。
 - 离线验证：SOLO body 协议测试、工具路由隔离测试、显式回退测试、Python 编译通过；恢复 `star` 账号后受控真实请求已认证通过，但 `glm-5.3` 与 `deepseek-v4-flash` 均返回上游 `param is invalid`，灰度保持关闭，未继续探针。
 
 ## 通道诊断记录 (2026-09-06 晚)：raw 网关故障，锁定 remote
