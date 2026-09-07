@@ -1,5 +1,11 @@
 # CHANGELOG — trae2api-cn
 
+## v16 (2026-09-07)：官方 TraeCode CLI ACP 安全探测
+- 按官方 Windows 安装脚本审查后，未执行其硬编码 `%LOCALAPPDATA%\\trae-cli` 安装流程；从官方 CDN 下载 `trae-cli_0.120.52_windows_amd64.zip`，手动安装到 `A:\\DevTools\\trae-cli\\bin`，未修改用户 PATH、未覆盖 `C:\\Users\\huang\\.trae-cn`。
+- 验证：`traecli --version` 为 `0.120.52`；`traecli acp serve --help` 正常；ACP `initialize` 与 `session/new` 均成功，声明 `loadSession`、MCP HTTP/SSE 和 `default/bypass_permissions/plan` 模式。
+- 当前隔离配置没有企业 CLI 登录和有效模型：`session/new.models.availableModels=null`，`doctor` 报 `no effective model configured`；未发送 `session/prompt`，未执行工具调用。
+- CLI 的自带 ripgrep 曾释放到 C 盘临时目录，已复制到 `A:\\DevTools\\trae-cli\\localappdata` 并清理本次产生的 `C:\\Users\\huang\\AppData\\Local\\trae-cli`；后续 CLI 进程可通过 `USERPROFILE/HOME/APPDATA/LOCALAPPDATA` 重定向到 A 盘。
+
 ## v15 (2026-09-07)：工具请求灰度接入 SOLO 原生 tool_calls
 - 新增 `llm_utils_chat + function=solo_work_lite` 通道：带 `tools` / 工具续轮历史的请求优先走 SOLO；普通请求继续走既有 remote。
 - OpenAI 工具 schema 转为 Trae 格式：`parameters` 序列化为 JSON 字符串，assistant `tool_calls[].function` 转为上游 `function_call`；SSE 继续复用现有 OpenAI tool-call 翻译器。
