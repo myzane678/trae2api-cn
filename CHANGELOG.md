@@ -1,5 +1,11 @@
 # CHANGELOG — trae2api-cn
 
+## v20 (2026-09-07)：测试环境隔离 + _FakeUsageTracker 同步
+
+- **修复 `_tracked_stream` 测试脱节**：v18（d0e2e39）给 `_tracked_stream` 增加了 `tracker.first_token_ms` / `tracker.started` 读取（TTFB 统计），但 tests 的 `_FakeUsageTracker` 未同步 → 首帧即 `AttributeError`，`UsageStreamTerminalTests` 4 个用例稳定超时。已补齐两个字段。
+- **新增 `tests/conftest.py` 统一测试环境隔离**：生产 `.env` 含 `TRAE_MODEL_ALLOWLIST`、`TRAE_REMOTE_PROMPT_TOOLS_ENABLED=true`，且 `data/model-allowlist.json`（运行时文件）存在时，全部 `model=auto` / 呼方 tools 用例会 403。conftest 在收集前置空 `RELAY_API_KEYS` / `TRAE_MODEL_ALLOWLIST` / `TRAE_REMOTE_PROMPT_TOOLS_ENABLED` 并屏蔽运行时白名单文件加载，任何部署配置下全量测试可复现。
+- 全量回归：pytest 401 passed（此前本地部署配置下 50 failed）。
+
 ## v19 (2026-09-07)：删除 solo_work_lite 死代码 + 提示词桥默认开启
 - 删除 v15 遗留的 SOLO Lite 工具通道代码：`_solo_messages`、`_solo_tools`、`resolve_solo_model`、`build_solo_chat_body`、`send_solo_chat_request`（trae_client.py）、`run_solo_chat` + dispatch solo 分支（main.py）、3 个对应测试（test_main_smoke.py）。
 - 不动的：`trae_decrypt` 里的 SOLO CN 桌面登录态探测（auth 功能）、`remote_agent_type` 里的 `solo_work_lite` 别名归一（tier 映射）、`traework_native_bridge` 里的 solo_lite 原生桥设置。

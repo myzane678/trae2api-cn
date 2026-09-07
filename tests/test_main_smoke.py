@@ -1515,6 +1515,10 @@ class UsageRecordTests(unittest.TestCase):
 class _FakeUsageTracker:
     def __init__(self):
         self.statuses = []
+        # Mirrors _UsageTracker's streaming fields: _tracked_stream reads
+        # first_token_ms / started on the first chunk (TTFB accounting).
+        self.first_token_ms = None
+        self.started = time.perf_counter()
 
     async def begin(self):
         pass
