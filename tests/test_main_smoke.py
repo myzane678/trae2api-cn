@@ -1483,33 +1483,49 @@ class UsageRecordTests(unittest.TestCase):
         self.assertFalse(main_module._USAGE_SNAPSHOT_TASKS)
 
     def test_rendered_console_keeps_javascript_newline_escapes(self):
+        # The console is a static template with placeholder substitution, so JS
+        # blocks never pass through an f-string.  Guard the same regressions:
+        # the rendered page must carry the functional anchors and its JS escapes
+        # must survive rendering intact.
         html = main_module._web_login_html()
         self.assertIn("requestJSON", html)
-        self.assertIn("消耗积分", html)
-        self.assertIn("join('\\n')", html)
-        self.assertNotIn("失败：\n'+", html)
-        self.assertIn("[hidden] { display:none !important; }", html)
-        self.assertIn("setAccountCheckinBusy(id,true)", html)
-        self.assertIn("checkinAccountBusy=new Set()", html)
-        self.assertIn("checkinAccountBusy.has", html)
-        self.assertIn("查询签到状态", html)
-        self.assertIn("查询全部积分", html)
-        self.assertIn("async function creditsRefreshAll()", html)
+        self.assertIn("postJSON", html)
+        # Functional anchors: every admin capability must stay wired.
+        for api in (
+            "/api/checkin/accounts",
+            "/api/checkin/claim-all",
+            "/api/checkin/claim",
+            "/api/checkin/credits/accounts",
+            "/api/usage/records",
+            "/api/allowlist",
+            "/api/model-test",
+            "/api/accounts/switch",
+            "/api/accounts/remove",
+            "/api/polling",
+            "/api/stop",
+            "/api/web-auth",
+        ):
+            self.assertIn(api, html)
+        # A backslash escape inside the script must survive rendering verbatim
+        # (the v5 incident: an f-string ate the newline escape and broke every button).
+        self.assertIn("\\n", html)
+        self.assertNotIn("{{", html)
+        for placeholder in (
+            "{{UPSTREAM_MODE}}",
+            "{{LISTENER_PORT}}",
+            "{{CLIENT_ID}}",
+            "{{AUTH_URL}}",
+            "{{API_KEY}}",
+            "{{CHECKIN_INTERVAL}}",
+        ):
+            self.assertNotIn(placeholder, html)
+        # Batch vs single check-in stay isolated: the bulk action must not be
+        # reachable from the per-account handler.
         single_start = html.index("async function checkinAccount(id)")
-        single_end = html.index("async function checkinClaimAll()", single_start)
+        single_end = html.index("async function checkinAll()", single_start)
         single_account = html[single_start:single_end]
-        self.assertNotIn("checkinRefreshAll()", single_account)
-        self.assertNotIn("var refresh=await requestJSON", single_account)
-        status_start = html.index("async function checkinRefreshAll()")
-        credits_start = html.index("async function creditsRefreshAll()", status_start)
-        status_refresh = html[status_start:credits_start]
-        self.assertIn("/api/checkin/accounts", status_refresh)
-        self.assertIn("updateAccountCheckinRow", status_refresh)
-        credits_end = html.index("async function checkinAccount(id)", credits_start)
-        credits_refresh = html[credits_start:credits_end]
-        self.assertIn("/api/checkin/credits/accounts", credits_refresh)
-        self.assertIn("updateAccountCreditsRow", credits_refresh)
-        self.assertNotIn("updateAccountCheckinRow", credits_refresh)
+        self.assertNotIn("checkinAll()", single_account)
+        self.assertIn("/api/checkin/claim", single_account)
 
 
 class _FakeUsageTracker:
@@ -3079,17 +3095,21 @@ class MainCliSmokeTests(unittest.TestCase):
         response = self.client.get("/web/login")
         self.assertEqual(response.status_code, 200)
         self.assertIn("refreshModels", response.text)
-        self.assertIn("获取模型列表", response.text)
+        self.assertIn("刷新模型列表", response.text)
 
     def test_web_login_usage_panel_is_below_account_list(self):
         response = self.client.get("/web/login")
         self.assertEqual(response.status_code, 200)
-        account_index = response.text.index('<div class="section-title">账号列表</div>')
-        usage_index = response.text.index('<div class="section-title">消费记录</div>')
-        polling_index = response.text.index('<div class="section-title">多账号轮询</div>')
+        # Sidebar navigation order: accounts before usage, usage before settings.
+        nav = response.text
+        account_index = nav.index('data-view="accounts"')
+        usage_index = nav.index('data-view="usage"')
+        settings_index = nav.index('data-view="settings"')
         self.assertLess(account_index, usage_index)
-        self.assertLess(usage_index, polling_index)
-        self.assertIn('<div class="panel-card" id="usage-panel">', response.text)
+        self.assertLess(usage_index, settings_index)
+        # Usage keeps its own view and rendering table.
+        self.assertIn('id="view-usage"', nav)
+        self.assertIn('id="usage-body"', nav)
 
     def test_usage_records_are_public_for_the_login_console(self):
         response = self.client.get("/api/usage/records")

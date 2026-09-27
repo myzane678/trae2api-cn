@@ -6,7 +6,8 @@ main.py - Trae CN Relay 中转站
   POST /v1/chat
   POST /v1
 
-上游模式:  UPSTREAM_MODE=cli  - 只使用本地 Trae CLI 子进程
+上游模式:  UPSTREAM_MODE=solo - SOLO llm_utils_chat（默认）：原生 tools + 结构化 tool_calls
+  UPSTREAM_MODE=cli  - 只使用本地 Trae CLI 子进程
   UPSTREAM_MODE=auto - 与 raw 相同，所有模型请求直达 Trae 原生 chat 协议
   UPSTREAM_MODE=raw  - 直连 Trae 原生 chat 协议（direct 为别名）
   UPSTREAM_MODE=remote/9router - 只用 9router 风格 remote 会话
@@ -58,6 +59,7 @@ from . import (
     responses_api,
     trae_client,
     trae_remote_client,
+    trae_solo,
     traework_native_bridge,
 )
 from .model_limits import clamp_max_completion_tokens
@@ -65,9 +67,16 @@ from .sse import (
     EmptyUpstreamResponse,
     ModelProviderMismatch,
     RepeatedCompletedToolResponse,
+    ToolCallAccumulator,
+    _finish_reason,
+    _map_usage,
+    _payload_finish_reason,
     collect_nonstream_cli,
     collect_nonstream_ide,
     collect_nonstream_web,
+    make_id,
+    openai_chunk,
+    openai_completion,
     translate_cli_stream,
     translate_ide_stream,
     translate_web_events,
@@ -119,7 +128,7 @@ def _save_allowlist_file() -> None:
 
 
 _load_allowlist_file()
-UPSTREAM_MODE = (os.environ.get("UPSTREAM_MODE", "remote") or "remote").lower()
+UPSTREAM_MODE = (os.environ.get("UPSTREAM_MODE", "solo") or "solo").lower()
 
 FORWARD_USAGE = (os.environ.get("FORWARD_USAGE", "true") or "true").lower() == "true"
 CHECKIN_INTERVAL = float(os.environ.get("TRAE_CHECKIN_INTERVAL_SECONDS", "60") or "60")
@@ -673,1055 +682,27 @@ def _status_badge() -> str:
 
 
 def _web_login_html() -> str:
-    s = auth.get_auth()
-    client_id = TRAE_CLIENT_ID
-    listener_port = LOCAL_LISTENER_PORT
-    auth_url = html_mod.escape(TRAE_AUTH_URL)
-    state = s
-    accounts = auth.list_accounts()
-    polling = auth.get_polling_status()
-    settings = auth.get_settings()
+    """Render the admin console from the static template.
 
-    # 根据当前状态显示不同文案
-    status_html = f"""
-    <div class="status-row">
-      <span class="label">状态</span>
-      {_status_badge()}
-      <span id="active-user-id" class="user-id"{' hidden' if not state.user_id else ''}>{f'用户: {html_mod.escape(state.user_id)}' if state.user_id else ''}</span>
-    </div>
-    <div class="status-row">
-      <span class="label">源</span>
-      <code>{html_mod.escape(state.source)}</code>
-      <span class="label separator">上游</span>
-      <code>{html_mod.escape(UPSTREAM_MODE)}</code>
-    </div>
-    <div class="status-row">
-      <span class="label">轮询</span>
-      <code>{'开' if polling.get('enabled') else '关'}</code>
-      <span class="label separator">账号数</span>
-      <code>{polling.get('account_count', 0)}</code>
-    </div>"""
-
-    # Consumption history is rendered in its own panel below the account list.
-    usage_records_html = """
-    <div id="usage-records-container" class="usage-records-container">
-      <table class="usage-table">
-        <thead>
-          <tr>
-            <th>时间</th>
-            <th>账号</th>
-            <th>模型</th>
-            <th class="numeric">首字</th>
-            <th class="numeric">耗时</th>
-            <th class="numeric">Tokens（入 / 出 / 总）</th>
-            <th class="numeric">消耗积分</th>
-            <th>状态</th>
-          </tr>
-        </thead>
-        <tbody id="usage-records-body"></tbody>
-      </table>
-      <div id="usage-empty" class="usage-empty">暂无消费记录</div>
-    </div>"""
-
-    # 账号列表
-    rows = ""
-    for acc in accounts:
-        if acc.get("is_valid"):
-            st = '<span class="badge badge-ok">有效</span>'
-        else:
-            st = '<span class="badge badge-expired">无效</span>'
-        act = (
-            '<span class="badge badge-active" data-account-active>当前</span>'
-            if acc.get("is_active")
-            else '<span class="badge badge-active" data-account-active hidden>当前</span>'
-        )
-        active_row = " active-row" if acc.get("is_active") else ""
-        # allow clicking "switch" even on the active account; switchAccount()
-        # gives an explicit toast instead of a silently disabled button
-        switch_disabled = ""
-        aid = acc.get("id") or ""
-        label = acc.get("label") or acc.get("user_id") or aid
-        uid = acc.get("user_id") or aid
-        expires = (acc.get("expires") or "")[:16]
-        acct_credits = acc.get("account_credits") or {}
-        if acct_credits.get("unlimited"):
-            credits_text = "\u2606 \u65e0\u9650"
-        elif acct_credits.get("remaining") is not None:
-            credits_text = f"\u5269{acct_credits['remaining']}/\u603b{acct_credits.get('total_limit','?')}"
-        else:
-            credits_text = "-"
-        work_acct = acc.get("work_credits") or {}
-        if work_acct.get("unlimited"):
-            work_credits_text = "☆ 无限"
-        elif work_acct.get("remaining") is not None:
-            work_credits_text = f"剩{float(work_acct['remaining']):.2f}/总{float(work_acct.get('total_limit') or 0):.2f}"
-        else:
-            work_credits_text = "-"
-        total = acc.get("total_credits") or {}
-        if total.get("unlimited"):
-            total_credits_text = "☆ 无限"
-        elif total.get("remaining") is not None:
-            total_credits_text = f"剩{float(total['remaining']):.2f}/总{float(total.get('total_limit') or 0):.2f}"
-        else:
-            total_credits_text = "-"
-        credits = acc.get("credits")
-        checked_in = acc.get("checked_in")
-        if checked_in is True:
-            checkin_badge = '<span class="badge badge-ok">已签到</span>'
-        elif checked_in is False:
-            checkin_badge = '<span class="badge badge-active">未签到</span>'
-        else:
-            checkin_badge = '<span class="badge badge-none">未知</span>'
-        rows += f"""<tr id="row-{html_mod.escape(aid)}" class="{active_row.strip()}" data-account-id="{html_mod.escape(aid)}">
-          <td><strong>{html_mod.escape(label)}</strong><small class="row-subtitle">{html_mod.escape(uid)}</small></td>
-          <td><code>{html_mod.escape(uid)}</code></td>
-          <td>{st} {act}</td>
-          <td class="muted-cell">{html_mod.escape(expires)}</td>
-          <td><span id="credits-{html_mod.escape(aid)}" class="credit-value">{credits_text}</span></td>
-          <td><span id="work-credits-{html_mod.escape(aid)}" class="credit-value">{work_credits_text}</span></td>
-          <td><span id="total-credits-{html_mod.escape(aid)}" class="credit-value">{total_credits_text}</span></td>
-          <td><span id="checkin-{html_mod.escape(aid)}" class="checkin-state">{checkin_badge}</span><small id="checkin-detail-{html_mod.escape(aid)}" class="row-subtitle"></small></td>
-          <td class="row-actions">
-            <button class="btn btn-ghost btn-sm" data-action="checkin" onclick="checkinAccount('{html_mod.escape(aid)}')" title="签到">签到</button>
-            <button class="btn btn-ghost btn-sm" data-action="switch-account" onclick="switchAccount('{html_mod.escape(aid)}')" title="切换当前账号"{switch_disabled}>切换</button>
-            <button class="btn btn-danger btn-sm" onclick="removeAccount('{html_mod.escape(aid)}')" title="删除账号">删除</button>
-          </td>
-        </tr>"""
-    if accounts:
-        accounts_html = f"""<div class="form-group">
-          <div class="section-head"><div><label>账号列表（{len(accounts)}）</label><span id="checkin-summary" class="section-meta">等待查询</span></div><span id="checkin-updated" class="section-meta"></span></div>
-          <div class="btn-group account-toolbar" aria-live="polite">
-            <button class="btn btn-secondary btn-sm" id="checkin-status-refresh-btn" onclick="checkinRefreshAll()">查询签到状态</button>
-            <button class="btn btn-secondary btn-sm" id="credits-refresh-btn" onclick="creditsRefreshAll()">查询全部积分</button>
-            <button class="btn btn-primary btn-sm" id="checkin-claim-btn" onclick="checkinClaimAll()">一键轮询签到</button>
-            <span id="account-msg" class="msg inline-msg" role="status" aria-live="polite"></span>
-            <span id="checkin-msg" class="msg inline-msg" role="status" aria-live="polite"></span>
-            <span id="checkin-busy" class="busy-indicator" role="status" aria-live="polite">正在处理...</span>
-          </div>
-          <table class="acct-table">
-            <thead><tr><th>账号</th><th>用户ID</th><th>状态</th><th>有效期</th><th>通用积分</th><th>Work积分</th><th>总积分</th><th>签到状态</th><th>操作</th></tr></thead>
-            <tbody>{rows}</tbody>
-          </table>
-        </div>"""
-    else:
-        # Keep the account actions in the DOM even before the first login.
-        # This gives the console a stable control surface and lets the same
-        # frontend code handle an account list that becomes populated after a
-        # login without requiring a page-specific script branch.
-        accounts_html = '''
-        <p style="font-size:13px;color:#9aa0b0;margin-bottom:8px">暂无账号，请先登录或手动添加。</p>
-        <div class="account-toolbar" hidden>
-          <button class="btn btn-secondary btn-sm" id="checkin-status-refresh-btn" onclick="checkinRefreshAll()">查询签到状态</button>
-          <button class="btn btn-secondary btn-sm" id="credits-refresh-btn" onclick="creditsRefreshAll()">查询全部积分</button>
-          <button class="btn btn-primary btn-sm" id="checkin-claim-btn" onclick="checkinClaimAll()">一键轮询签到</button>
-        </div>'''
-
-    logout_btn = ''
-    if state.token:
-        logout_btn = '<button class="btn btn-ghost btn-sm" onclick="logout()">登出</button>'
-    stop_btn = '<button class="btn btn-danger btn-sm" onclick="stopService()" title="停止 Trae CN Relay 服务（需手动运行 start-trae2api.cmd 恢复）">停止服务</button>'
-
-    settings_web = settings.get("web_base_url") or WEB_BASE
-    settings_port = settings.get("relay_port") or PORT
-    poll_checked = 'checked' if polling.get("enabled") else ''
-    poll_mode_rr = 'checked' if polling.get('mode', 'round-robin') == 'round-robin' else ''
-    poll_mode_cp = 'checked' if polling.get('mode') == 'credit-priority' else ''
-
-    return f"""<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Trae CN Relay 控制台</title>
-<style>
-* {{ margin: 0; padding: 0; box-sizing: border-box; }}
-body {{
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: #0f1117; color: #e8eaed; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
-  padding: 24px;
-}}
-.panel {{
-  background: #1a1d28; border-radius: 8px; max-width: 1500px; width: 100%;
-  padding: 24px; border: 1px solid #2d3140; box-shadow: 0 18px 45px rgba(0,0,0,.18);
-}}
-.panel-grid {{
-  display: block;
-  width: 100%;
-}}
-.panel-card {{
-  background: #151823;
-  border: 1px solid #2d3140;
-  border-radius: 8px;
-  padding: 18px 16px;
-  min-width: 0;
-  overflow-x: auto;
-  margin-bottom: 16px;
-}}
-h1 {{ font-size: 20px; font-weight: 600; margin-bottom: 16px; }}
-.section-head {{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }}
-.section-head > div {{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }}
-.section-meta {{ color:#7f8799; font-size:12px; font-weight:400; }}
-.status-row {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: 13px; }}
-.status-row .label {{ color: #9aa0b0; }}
-.status-row .separator {{ margin-left: 8px; }}
-.status-row code {{ background: #252836; padding: 1px 6px; border-radius: 4px; font-size: 12px; }}
-.badge {{ display:inline-flex; align-items:center; gap:4px; font-size: 12px; padding: 3px 9px; border-radius: 999px; font-weight: 600; white-space:nowrap; }}
-[hidden] {{ display:none !important; }}
-.badge-ok {{ background: #1f6c3a; color: #a8e6b8; }}
-.badge-expired {{ background: #6c3a1f; color: #e6b8a8; }}
-.badge-none {{ background: #2d3140; color: #9aa0b0; }}
-.badge-active {{ background: #1a3a6c; color: #a8c6e6; }}
-.user-id {{ color: #8ab4f8; font-size: 12px; }}
-hr {{ border: none; border-top: 1px solid #2d3140; margin: 16px 0; }}
-.btn {{
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 500;
-  cursor: pointer; border: 1px solid transparent; transition: all .15s;
-  text-decoration: none; color: #fff; min-height: 32px;
-}}
-.btn-sm {{ padding: 5px 10px; font-size: 12px; }}
-.btn-primary {{ background: #1a8c5c; border-color: #1a8c5c; }}
-.btn-primary:hover {{ background: #14a06a; }}
-.btn-primary:disabled {{ opacity: .5; cursor: not-allowed; }}
-.btn-secondary {{ background: #2d3140; border-color: #3a3f54; }}
-.btn-secondary:hover {{ background: #3a3f54; }}
-.btn-danger {{ background: #8c1f1f; border-color: #8c1f1f; }}
-.btn-danger:hover {{ background: #a02020; }}
-.btn-ghost {{ background: transparent; border-color: #3a3f54; color: #9aa0b0; }}
-.btn-ghost:hover {{ border-color: #5a5f74; color: #e8eaed; }}
-.btn-danger {{ background: transparent; border-color:#67323a; color:#e9a8ae; }}
-.btn-danger:hover {{ background:#55252d; border-color:#914550; color:#ffd9dd; }}
-.btn-group {{ display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }}
-.account-toolbar {{ align-items:center; margin: 10px 0 14px; }}
-.account-toolbar .inline-msg {{ margin:0; flex:1 1 260px; }}
-.form-group {{ margin-bottom: 12px; }}
-.form-group label {{ display: block; font-size: 12px; color: #9aa0b0; margin-bottom: 4px; }}
-.form-group input, .form-group textarea {{
-  width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #3a3f54;
-  background: #252836; color: #e8eaed; font-size: 13px; font-family: "SF Mono", Consolas, monospace;
-}}
-.form-group textarea {{ resize: vertical; min-height: 60px; }}
-.form-group input:focus, .form-group textarea:focus {{ outline: none; border-color: #1a8c5c; }}
-.acct-table {{ width: 100%; min-width: 980px; border-collapse: collapse; font-size: 13px; }}
-.acct-table th, .acct-table td {{ text-align: left; padding: 9px 8px; border-bottom: 1px solid #2d3140; vertical-align: middle; }}
-.acct-table tbody tr {{ transition: background .15s ease; }}
-.acct-table tbody tr:hover {{ background:#1d2130; }}
-.acct-table tbody tr.active-row {{ background:rgba(26,140,92,.12); box-shadow:inset 3px 0 #1a8c5c; }}
-.acct-table tbody tr.active-row:hover {{ background:rgba(26,140,92,.18); }}
-.acct-table tbody tr.row-failed {{ background:rgba(140,31,31,.12); }}
-.acct-table tbody tr.row-failed:hover {{ background:rgba(140,31,31,.2); }}
-.acct-table th {{ color: #9aa0b0; font-weight: 600; font-size: 12px; position:sticky; top:0; background:#151823; z-index:1; }}
-.acct-table th:nth-child(n+5):nth-child(-n+7), .acct-table td:nth-child(n+5):nth-child(-n+7) {{ text-align:right; }}
-.credit-value {{ font-variant-numeric: tabular-nums; white-space:nowrap; color:#cbd0dc; }}
-.muted-cell {{ color:#8c93a4; font-size:12px; white-space:nowrap; }}
-.row-subtitle {{ display:block; color:#7f8799; font-size:11px; margin-top:3px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
-.row-actions {{ white-space:nowrap; }}
-.row-actions .btn {{ margin:2px 0; }}
-.usage-records-container {{ max-height: 320px; overflow: auto; }}
-.usage-table {{ width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13px; table-layout: fixed; }}
-.usage-table th, .usage-table td {{ text-align: left; padding: 7px 8px; border-bottom: 1px solid #2d3140; overflow-wrap: anywhere; }}
-.usage-table th {{ color: #9aa0b0; font-weight: 500; font-size: 12px; position: sticky; top: 0; background: #151823; }}
-.usage-table .numeric {{ text-align: right; font-variant-numeric:tabular-nums; }}
-.usage-table .usage-status {{ white-space:nowrap; }}
-.usage-empty {{ padding: 18px 12px; color: #888; text-align: center; font-size: 13px; }}
-.msg {{ margin-top: 12px; padding: 8px 12px; border-radius: 6px; font-size: 13px; display: none; line-height:1.45; }}
-.msg-ok {{ background: #1f6c3a; color: #a8e6b8; display: block; }}
-.msg-err {{ background: #6c1f1f; color: #e6a8a8; display: block; }}
-.busy-indicator {{ display:none; color:#9aa0b0; font-size:12px; align-items:center; gap:6px; }}
-.busy-indicator.visible {{ display:inline-flex; }}
-.busy-indicator::before {{ content:""; width:10px; height:10px; border:2px solid #4a5064; border-top-color:#76d5a5; border-radius:50%; animation:relay-spin .7s linear infinite; }}
-@keyframes relay-spin {{ to {{ transform:rotate(360deg); }} }}
-.toast {{ position:fixed; top:20px; right:20px; z-index:20; width:min(420px,calc(100vw - 40px)); padding:12px 14px; border:1px solid #3a3f54; border-radius:8px; background:#1d2130; color:#e8eaed; box-shadow:0 12px 32px rgba(0,0,0,.35); opacity:0; transform:translateY(-8px); pointer-events:none; transition:opacity .18s ease, transform .18s ease; white-space:pre-wrap; line-height:1.45; }}
-.toast.visible {{ opacity:1; transform:translateY(0); }}
-.toast.ok {{ border-color:#2c8150; }}
-.toast.error {{ border-color:#9a3d47; color:#ffd9dd; background:#331d25; }}
-.toast-title {{ display:block; font-size:12px; font-weight:700; margin-bottom:3px; color:#a8e6b8; }}
-.toast.error .toast-title {{ color:#ffb7bf; }}
-.busy {{ opacity:.65; pointer-events:none; }}
-.loading {{ margin-top: 12px; display: none; font-size: 13px; color: #9aa0b0; }}
-.section-title {{ font-size: 14px; font-weight: 600; color: #c8cbd6; margin: 14px 0 8px; }}
-.check-row {{ display: flex; align-items: center; gap: 8px; font-size: 13px; color: #9aa0b0; }}
-@media (max-width: 720px) {{
-  body {{ padding:10px; }}
-  .panel {{ padding:14px 10px; }}
-  .panel-card {{ padding:14px 10px; }}
-  h1 {{ font-size:18px; }}
-  .status-row {{ font-size:12px; }}
-  .btn {{ padding:8px 12px; }}
-  .btn-sm {{ padding:6px 9px; }}
-  .account-toolbar {{ align-items:stretch; }}
-  .account-toolbar .btn {{ flex:1 1 150px; }}
-  .account-toolbar .inline-msg {{ flex-basis:100%; }}
-  .usage-table {{ min-width:560px; }}
-}}
-</style>
-</head>
-<body>
-<div id="toast" class="toast" role="alert" aria-live="assertive"><span id="toast-title" class="toast-title"></span><span id="toast-text"></span></div>
-<div class="panel">
-<h1>Trae CN Relay 控制台</h1>
-<div class="status-row" style="justify-content:space-between;align-items:center">
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">{status_html}</div>
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">{stop_btn}{logout_btn}</div>
-</div>
-<hr>
-<div class="panel-grid">
-<div class="panel-card">
-<div class="section-title">授权登录</div>
-<p style="font-size:13px;color:#9aa0b0;margin-bottom:8px;line-height:1.5">
-  1. 点击下方按钮后会自动检测本机授权助手（<code>127.0.0.1:{listener_port}</code>）。<br>
-  2. 若未检测到，请先下载 <code>web_login.py</code>（或一键 <code>start_auth.bat</code>）并在<b>本机</b>运行，再重试。<br>
-  3. 确保浏览器已登录 <a href="https://www.trae.cn/dashboard" target="_blank" rel="noopener" style="color:#8ab4f8">trae.cn</a>，授权完成后凭据自动写入服务器。
-</p>
-<div class="btn-group">
-  <button class="btn btn-primary" onclick="startAuth()" id="auth-btn">使用 Trae 网页授权登录</button>
-  <a class="btn btn-ghost" href="https://www.trae.cn/dashboard" target="_blank" rel="noopener">访问 trae.cn 控制台</a>
-</div>
-<details>
-  <summary style="font-size:13px;color:#9aa0b0;cursor:pointer">下载本机授权助手（首次登录/换号才需要）</summary>
-  <div class="btn-group" style="margin-top:10px">
-    <a class="btn btn-secondary" href="/web/login/download" download>下载本机授权助手 web_login.py</a>
-    <a class="btn btn-ghost" href="/web/login/download?as=bat" download id="bat-link" style="display:none">下载一键启动 start_auth.bat</a>
-  </div>
-</details>
-<div id="loading" class="loading">等待授权中...</div>
-<div id="auth-msg" class="msg"></div>
-<hr>
-</div>
-<div class="panel-card">
-<div class="section-title">账号列表</div>
-{accounts_html}
-<details>
-  <summary style="font-size:13px;color:#9aa0b0;cursor:pointer">手动填写凭证添加账号</summary>
-  <form id="manual-form" style="margin-top:12px">
-    <div class="form-group">
-      <label>Token（Cloud-IDE-JWT）<span style="color:#e6a8a8">*</span></label>
-      <textarea name="token" required placeholder="eyJhbGciOiJSUzI1NiI6Ik9wZW5TU0..."></textarea>
-    </div>
-    <div class="form-group">
-      <label>Refresh Token</label>
-      <input name="refreshToken" placeholder="可选">
-    </div>
-    <div class="form-group">
-      <label>User ID</label>
-      <input name="userId" placeholder="可选">
-    </div>
-    <div class="form-group">
-      <label>Client ID</label>
-      <input name="clientId" value="{html_mod.escape(client_id)}">
-    </div>
-    <div class="form-group">
-      <label>备注（标签）</label>
-      <input name="label" placeholder="可选">
-    </div>
-    <button type="submit" class="btn btn-primary">添加账号</button>
-    <div id="manual-msg" class="msg"></div>
-  </form>
-</details>
-</div>
-<div class="panel-card" id="usage-panel">
-<div class="section-head"><div class="section-title">消费记录</div><span id="usage-updated" class="section-meta"></span></div>
-<div id="usage-msg" class="msg" role="status" aria-live="polite"></div>
-{usage_records_html}
-</div>
-<div class="panel-card">
-<details>
-<summary style="font-size:13px;color:#9aa0b0;cursor:pointer">多账号轮询（多账号用户才需要，单账号可无视）</summary>
-<div style="margin-top:10px">
-<div class="section-title">多账号轮询</div>
-<div class="check-row">
-  <input type="checkbox" id="poll-toggle" {poll_checked} onchange="togglePolling()">
-  <label for="poll-toggle" style="cursor:pointer">启用轮询（每次请求自动切换下一个有效账号）</label>
-</div>
-<div class="check-row" style="margin-top:4px">
-  <span class="label" style="margin-right:8px">轮询模式:</span>
-  <label style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;cursor:pointer">
-    <input type="radio" name="poll-mode" value="round-robin" onchange="togglePolling()" {poll_mode_rr}> 顺序轮询
-  </label>
-  <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
-    <input type="radio" name="poll-mode" value="credit-priority" onchange="togglePolling()" {poll_mode_cp}> 积分优先
-  </label>
-</div>
-<p id="poll-status" style="font-size:12px;color:#9aa0b0;margin-top:4px">当前账号数: {polling.get('account_count', 0)}，轮询: {'开' if polling.get('enabled') else '关'}</p>
-</div>
-</details>
-<hr>
-<div class="section-title">自定义 URL / 端口</div>
-<div class="form-group">
-  <label>Web Base URL</label>
-  <input id="settings-web" value="{html_mod.escape(settings_web)}" placeholder="https://trae-api-cn.mchost.guru/api/remote/v1">
-</div>
-<div class="form-group">
-  <label>Relay 端口（需重启容器生效）</label>
-  <input id="settings-port" type="number" value="{settings_port}" placeholder="8000">
-</div>
-<div class="btn-group">
-  <button class="btn btn-secondary" onclick="saveSettings()">保存设置</button>
-</div>
-<div id="settings-msg" class="msg"></div>
-<hr>
-<div class="section-title">模型列表 / 白名单</div>
-<div class="form-group">
-  <label>下方为当前白名单（暴露到 /v1/models 并允许调用）。去掉勾选再保存即移出；要新增模型用底部下拉挑选后点「添加」，最后点「保存白名单」生效。</label>
-</div>
-<div class="btn-group">
-  <button class="btn btn-secondary" onclick="refreshModels()">获取模型列表</button>
-  <button class="btn btn-primary" id="allowlist-save-btn" onclick="saveAllowlist()">保存白名单</button>
-  <span id="allowlist-count" style="font-size:12px;color:#9aa0b0;align-self:center"></span>
-</div>
-<div id="models-out" style="margin-top:12px;padding:12px;background:#252836;border-radius:6px;font-size:13px;max-height:280px;overflow:auto;display:none"></div>
-<div class="btn-group" id="allowlist-add-row" style="margin-top:10px;display:none;align-items:center">
-  <select id="allowlist-add-select" style="padding:6px 8px;background:#252836;border:1px solid #363a4a;border-radius:6px;color:#e6e8ef;font-size:13px;max-width:320px"></select>
-  <button class="btn btn-ghost btn-sm" onclick="addAllowlistModel()">添加</button>
-</div>
-<div id="models-msg" class="msg"></div>
-</div>
-<div class="panel-card" id="conn-panel">
-  <div class="section-head">
-    <div class="section-title">模型连通性测试</div>
-    <span id="conn-summary" class="section-meta">未运行</span>
-  </div>
-  <div class="form-group">
-    <label for="conn-models">测试模型（逗号或换行分隔，留空使用下方常用模型）</label>
-    <textarea id="conn-models" rows="2" placeholder="glm-5.3, DeepSeek-V4-Pro-Official"
-      style="width:100%;box-sizing:border-box;padding:8px;background:#252836;border:1px solid #363a4a;border-radius:6px;color:#e6e8ef;font-size:12px;font-family:inherit"></textarea>
-  </div>
-  <div class="form-group">
-    <label>测试内容</label>
-    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-      <label style="display:inline-flex;align-items:center;gap:6px;font-weight:400">
-        <input type="checkbox" id="conn-mode-text" checked> 文本回复
-      </label>
-      <label style="display:inline-flex;align-items:center;gap:6px;font-weight:400">
-        <input type="checkbox" id="conn-mode-tool"> 工具调用
-      </label>
-      <label style="display:inline-flex;align-items:center;gap:6px;font-weight:400">
-        超时(秒) <input type="number" id="conn-timeout" value="120" min="10" max="600"
-          style="width:72px;padding:4px 6px;background:#252836;border:1px solid #363a4a;border-radius:4px;color:#e6e8ef">
-      </label>
-    </div>
-  </div>
-  <div class="btn-group">
-    <button class="btn btn-secondary" id="conn-run-btn" onclick="runConnTest()">开始测试</button>
-    <button class="btn btn-secondary" onclick="fillConnPreset()">填入常用模型</button>
-  </div>
-  <table id="conn-table" style="width:100%;margin-top:12px;border-collapse:collapse;font-size:12px;display:none">
-    <thead><tr style="text-align:left;color:#9aa0b0">
-      <th style="padding:6px 4px">模型</th><th style="padding:6px 4px">类型</th>
-      <th style="padding:6px 4px">结果</th><th style="padding:6px 4px">耗时</th>
-      <th style="padding:6px 4px">详情</th>
-    </tr></thead>
-    <tbody id="conn-tbody"></tbody>
-  </table>
-  <div id="conn-msg" class="msg"></div>
-</div>
-</div>
-<script>
-const state = {{ traceId: null, win: null }};
-let currentCodeVerifier = '';
-function uuid() {{ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){{var r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16)}}) }}
-function randomHex(n) {{ var a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,b=>b.toString(16).padStart(2,'0')).join('') }}
-function randomDigits(n) {{ var s='';while(s.length<n)s+=Math.floor(Math.random()*1e10).toString();return s.slice(0,n) }}
-function randomBase64Url(n) {{ var a=new Uint8Array(n); if(window.crypto&&crypto.getRandomValues){{ crypto.getRandomValues(a) }} else {{ for(var i=0;i<n;i++)a[i]=Math.floor(Math.random()*256) }} return btoa(String.fromCharCode.apply(null,a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'') }}
-function buildChallenge() {{ currentCodeVerifier=randomBase64Url(32); return sha256Base64Url(currentCodeVerifier) }}
-async function buildAuthUrl() {{
-  // Trae 授权页强制要求回调为 http://127.0.0.1:<port>/authorize，
-  // 因此必须由本机 web_login.py 监听并转发凭据到服务器。
-  var cb = 'http://127.0.0.1:{listener_port}/authorize';
-  var mid = randomHex(32), did = randomDigits(19), tid = state.traceId;
-  var p = new URLSearchParams({{
-    login_version:'1',auth_from:'solo',login_channel:'native_ide',plugin_version:'2.3.24254',
-    auth_type:'local',client_id:'{html_mod.escape(client_id)}',redirect:'0',login_trace_id:tid,
-    auth_callback_url:cb,machine_id:mid,device_id:did,x_device_id:did,x_machine_id:mid,
-    x_device_brand:'ASUS TUF Gaming A15 FA507RM_FA507RM',x_device_type:'windows',x_os_version:'Windows 10 Pro',x_env:'',
-    x_app_version:'3.3.65',x_app_type:'stable',hide_saas_login:'true',
-  }});
-  return '{auth_url}?'+p.toString();
-}}
-async function checkLocalListener() {{
-  try {{
-    var ctrl = new AbortController();
-    var timer = setTimeout(function(){{ ctrl.abort(); }}, 1200);
-    var r = await fetch('http://127.0.0.1:{listener_port}/healthz', {{signal: ctrl.signal, cache: 'no-store'}});
-    clearTimeout(timer);
-    return r.ok;
-  }} catch(e) {{ return false; }}
-}}
-async function startAuth() {{
-  try {{
-  var ok = await checkLocalListener();
-  if (!ok) {{
-    showMsg('auth-msg', '未检测到本机授权助手，请先下载并双击运行 web_login.py（需 Python）或 start_auth.bat：', false);
-    document.getElementById('bat-link').style.display='inline-flex';
-    return;
-  }}
-  state.traceId = uuid();
-  var url = await buildAuthUrl();
-  var w = window.open(url, 'trae-relay-oauth', 'width=560,height=760');
-  if (!w) {{ showMsg('auth-msg','浏览器已拦截，请允许弹窗',false); return; }}
-  state.win = w;
-  document.getElementById('loading').style.display='block';
-  document.getElementById('auth-btn').disabled=true;
-  var poll = setInterval(function(){{ if(w.closed){{ clearInterval(poll);document.getElementById('loading').style.display='none';document.getElementById('auth-btn').disabled=false; }} }},700);
-  }} catch(e) {{ showMsg('auth-msg',String(e),false); document.getElementById('loading').style.display='none'; document.getElementById('auth-btn').disabled=false; }}
-}}
-
-let usageRefreshing = false;
-async function refreshUsage() {{
-  if(usageRefreshing) return;
-  usageRefreshing=true;
-  var tbody=document.getElementById('usage-records-body');
-  var empty=document.getElementById('usage-empty');
-  var msg=document.getElementById('usage-msg');
-  try {{
-    var result=await requestJSON('/api/usage/records',{{method:'GET'}},15000);
-    if(!result.ok) throw new Error(apiError(result.data,result.status));
-    var records=Array.isArray(result.data)?result.data:[];
-    if(!tbody) return;
-    if(records.length===0) {{
-      tbody.innerHTML='';
-      if(empty) empty.style.display='block';
-    }} else {{
-      if(empty) empty.style.display='none';
-      tbody.innerHTML=records.map(function(record) {{
-        var stamp=Number(record.timestamp||0);
-        var when=stamp?new Date(stamp*1000).toLocaleString():'--';
-        var account=record.account_id?String(record.account_id).slice(-12):'--';
-        var model=record.model||'--';
-        var input=Number(record.input_tokens!==undefined?record.input_tokens:(record.prompt_tokens||0));
-        var output=Number(record.output_tokens!==undefined?record.output_tokens:(record.completion_tokens||0));
-        var total=Number(record.total_tokens!==undefined?record.total_tokens:(input+output));
-        var tokenText=record.tokens_source==='unknown'?'--':(input+' / '+output+' / '+total);
-        var ttfb=record.ttfb_ms;
-        var ttfbText=(ttfb===null||ttfb===undefined||ttfb<0)?'-':(Number(ttfb)/1000).toFixed(1)+'s';
-        var durMs=record.duration_ms;
-        var durText=(durMs===null||durMs===undefined||durMs<0)?'-':(Number(durMs)/1000).toFixed(1)+'s';
-        var credits=record.credits_consumed;
-        var creditText=credits===null||credits===undefined?'--':Number(credits).toFixed(2);
-        var source=record.credits_source||'unknown';
-        var status=record.status||'completed';
-        var statusText=status==='completed'?'完成':(status==='cancelled'?'已取消':(status==='error'?'失败':status));
-        var badge=status==='completed'?'badge-ok':(status==='error'?'badge-expired':'badge-none');
-        return '<tr>'
-          + '<td>'+escapeHtml(when)+'</td>'
-          + '<td><code>'+escapeHtml(account)+'</code></td>'
-          + '<td>'+escapeHtml(model)+'</td>'
-          + '<td class="numeric">'+escapeHtml(ttfbText)+'</td>'
-          + '<td class="numeric">'+escapeHtml(durText)+'</td>'
-          + '<td class="numeric">'+escapeHtml(tokenText)+'</td>'
-          + '<td class="numeric" title="'+escapeHtml(source)+'">'+escapeHtml(creditText)+'</td>'
-          + '<td class="usage-status"><span class="badge '+badge+'">'+escapeHtml(statusText)+'</span></td>'
-          + '</tr>';
-      }}).join('');
-    }}
-    var updated=document.getElementById('usage-updated');
-    if(updated) updated.textContent='更新于 '+new Date().toLocaleTimeString()+' · '+records.length+' 条';
-    if(msg){{ msg.textContent=''; msg.className='msg'; }}
-  }} catch(e) {{
-    if(msg){{ msg.textContent=String(e); msg.className='msg msg-err'; }}
-    showToast('消费记录加载失败', String(e), false, 15000);
-  }} finally {{ usageRefreshing=false; }}
-}}
-setInterval(refreshUsage, 5000);
-refreshUsage();
-silentLoadState();
-window.addEventListener('message',function(ev){{
-  if (!ev.data||ev.data.type!=='trae-relay-web-login') return;
-  if (state.traceId&&ev.data.loginTraceId!==state.traceId) return;
-  if (ev.data.success) {{ showMsg('auth-msg','授权成功，凭证已写入服务器',true); setTimeout(function(){{ location.reload(); }},800); }}
-  else {{ showMsg('auth-msg',ev.data.error||'授权失败',false); }}
-  document.getElementById('loading').style.display='none';
-  document.getElementById('auth-btn').disabled=false;
-  if (state.win&&!state.win.closed) state.win.close();
-}});
-let messageTimers = {{}};
-let toastTimer = null;
-function showToast(title,text,ok,timeout){{
-  var toast=document.getElementById('toast');
-  var titleEl=document.getElementById('toast-title');
-  var textEl=document.getElementById('toast-text');
-  if(!toast) return;
-  clearTimeout(toastTimer);
-  titleEl.textContent=title||'';
-  textEl.textContent=text||'';
-  toast.className='toast visible '+(ok?'ok':'error');
-  var delay=timeout===undefined?(ok?3000:9000):timeout;
-  if(delay>0) toastTimer=setTimeout(function(){{ toast.className='toast'; }},delay);
-}}
-function showMsg(id,text,ok,timeout){{
-  var el=document.getElementById(id);
-  if(!el) return;
-  clearTimeout(messageTimers[id]);
-  if(!text){{ el.textContent=''; el.className='msg'; return; }}
-  el.textContent=text;
-  el.className='msg '+(ok?'msg-ok':'msg-err');
-  var delay=timeout===undefined?(ok?3000:9000):timeout;
-  if(delay>0) messageTimers[id]=setTimeout(function(){{ el.textContent=''; el.className='msg'; }},delay);
-  showToast(ok?'成功':'操作失败',text,ok,delay);
-}}
-function escapeHtml(value){{
-  return String(value===undefined||value===null?'':value).replace(/[&<>"']/g,function(ch){{ return {{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]; }});
-}}
-function responseCode(data){{
-  if(!data) return '';
-  var body=data.data||data;
-  return body && body.code!==undefined && body.code!==null ? String(body.code) : '';
-}}
-function apiError(data,status){{
-  var code=responseCode(data);
-  var message=(data&&data.error)||(data&&data.message)||(data&&data.data&&(data.data.message||data.data.error))||('HTTP '+(status||'未知'));
-  var prefix=status&&status!==200?'HTTP '+status:'';
-  if(code) prefix+=(prefix?'，':'')+'业务码 '+code;
-  return (prefix?prefix+'：':'')+String(message);
-}}
-async function requestJSON(url,options,timeoutMs){{
-  var controller=new AbortController();
-  var timeout=setTimeout(function(){{ controller.abort(); }},timeoutMs||45000);
-  var requestOptions=Object.assign({{cache:'no-store'}},options||{{}},{{signal:controller.signal}});
-  try{{
-    var response=await fetch(url,requestOptions);
-    var text=await response.text();
-    var data={{}};
-    if(text){{
-      try{{ data=JSON.parse(text); }}catch(e){{ data={{error:'服务返回了无效 JSON'}}; }}
-    }}
-    return {{ok:response.ok,status:response.status,data:data}};
-  }}catch(e){{
-    if(e&&e.name==='AbortError') throw new Error('请求超时，请检查上游连接后重试');
-    throw new Error('网络请求失败：'+String(e));
-  }}finally{{ clearTimeout(timeout); }}
-}}
-async function postJSON(url,payload,timeoutMs){{
-  try{{
-    var result=await requestJSON(url,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload||{{}})}},timeoutMs||45000);
-    var d=result.data;
-    if(!d||typeof d!=='object'||Array.isArray(d)) d={{}};
-    d._http_status=result.status; d._http_ok=result.ok;
-    return d;
-  }}catch(e){{ return {{success:false,error:String(e),_http_status:0,_http_ok:false}}; }}
-}}
-let checkinGlobalBusy=false;
-let checkinAccountBusy=new Set();
-async function silentLoadState(){{
-  try{{
-    var result=await requestJSON('/api/checkin/accounts',{{method:'GET'}},8000);
-    var d=result.data;
-    if(result.ok&&d&&d.success){{
-      (d.accounts||[]).forEach(updateAccountRow);
-    }}
-  }}catch(e){{}}
-}}
-function syncCheckinBusyUI(){{
-  var anyBusy=checkinGlobalBusy||checkinAccountBusy.size>0;
-  ['checkin-status-refresh-btn','credits-refresh-btn','checkin-claim-btn'].forEach(function(id){{
-    var el=document.getElementById(id); if(el){{ el.disabled=anyBusy; el.classList.toggle('busy',anyBusy); }}
-  }});
-  document.querySelectorAll('[data-action="checkin"]').forEach(function(el){{
-    var row=el.closest('tr[data-account-id]');
-    var id=row&&row.getAttribute('data-account-id');
-    var busy=checkinGlobalBusy||checkinAccountBusy.has(String(id||''));
-    el.disabled=busy;
-    el.classList.toggle('busy',busy);
-  }});
-  var indicator=document.getElementById('checkin-busy');
-  if(indicator){{ indicator.classList.toggle('visible',anyBusy); indicator.textContent=anyBusy?'正在处理...':''; }}
-}}
-function setBusy(busy){{
-  checkinGlobalBusy=!!busy;
-  syncCheckinBusyUI();
-}}
-function setAccountCheckinBusy(id,busy){{
-  id=String(id);
-  if(busy) checkinAccountBusy.add(id); else checkinAccountBusy.delete(id);
-  var row=document.getElementById('row-'+id);
-  if(row) row.classList.toggle('checkin-row-busy',busy);
-  var detail=document.getElementById('checkin-detail-'+id);
-  if(detail&&busy){{ detail.textContent='正在签到该账号...'; detail.style.color=''; }}
-  syncCheckinBusyUI();
-}}
-function setCredits(id,data){{
-  var values=[['credits-',data&&data.account_credits],['work-credits-',data&&data.work_credits],['total-credits-',data&&data.total_credits]];
-  values.forEach(function(pair){{
-    var el=document.getElementById(pair[0]+id), value=pair[1];
-    if(!el) return;
-    if(value===undefined||value===null) return;
-    if(value.unlimited) el.textContent='☆ 无限';
-    else if(value.remaining!==undefined&&value.remaining!==null) el.textContent='剩'+Number(value.remaining).toFixed(2)+'/总'+(value.total_limit===undefined?'?':Number(value.total_limit).toFixed(2));
-    else el.textContent='-';
-  }});
-}}
-function setCheckinState(id,checked,detail,error){{
-  var el=document.getElementById('checkin-'+id), detailEl=document.getElementById('checkin-detail-'+id);
-  if(el){{
-    var badge=checked===true?'<span class="badge badge-ok">已签到</span>':(checked===false?'<span class="badge badge-active">未签到</span>':'<span class="badge badge-none">未知</span>');
-    el.innerHTML=badge;
-  }}
-  if(detailEl){{ detailEl.textContent=error||detail||''; detailEl.style.color=error?'#f0a2aa':''; }}
-}}
-function updateAccountRow(account){{
-  if(!account||!account.id) return;
-  updateAccountCreditsRow(account);
-  updateAccountCheckinRow(account);
-}}
-function updateAccountCreditsRow(account){{
-  if(!account||!account.id) return;
-  setCredits(account.id,account);
-}}
-function updateAccountCheckinRow(account){{
-  if(!account||!account.id) return;
-  var payload=account.data||account.checkin||{{}};
-  var code=payload&&payload.code!==undefined?'业务码 '+payload.code:'';
-  var detail=account.error||code||'';
-  setCheckinState(account.id,account.checked_in,detail,account.error);
-  var row=document.getElementById('row-'+account.id);
-  if(row) row.classList.toggle('row-failed',!!account.error||account.success===false);
-}}
-function setActiveAccount(id,account){{
-  document.querySelectorAll('tr[data-account-id]').forEach(function(row){{
-    var active=row.getAttribute('data-account-id')===String(id);
-    row.classList.toggle('active-row',active);
-    var badge=row.querySelector('[data-account-active]');
-    if(badge) badge.hidden=!active;
-    var button=row.querySelector('[data-action="switch-account"]');
-    if(button) button.disabled=active;
-  }});
-  var user=document.getElementById('active-user-id');
-  if(user){{
-    var userId=account&&(account.user_id||account.id)||id||'';
-    user.textContent=userId?'用户: '+userId:'';
-    user.hidden=!userId;
-  }}
-}}
-function setSwitchBusy(busy){{
-  document.querySelectorAll('[data-action="switch-account"]').forEach(function(button){{
-    if(busy){{ button.disabled=true; }}
-    else {{
-      var row=button.closest('tr[data-account-id]');
-      button.disabled=!!(row&&row.classList.contains('active-row'));
-    }}
-  }});
-}}
-function updateCheckinSummary(accounts,action){{
-  var list=Array.isArray(accounts)?accounts:[];
-  var ok=list.filter(function(a){{ return a.checked_in===true; }}).length;
-  var failed=list.filter(function(a){{ return !!a.error||a.success===false; }}).length;
-  var summary=document.getElementById('checkin-summary');
-  if(summary) summary.textContent=(action||'已更新')+'：'+ok+' 已签到 / '+list.length+' 个账号'+(failed?'，'+failed+' 个异常':'');
-  var updated=document.getElementById('checkin-updated');
-  if(updated) updated.textContent='更新于 '+new Date().toLocaleTimeString();
-  return {{ok:ok,failed:failed,total:list.length}};
-}}
-function updateVisibleCheckinSummary(action){{
-  var rows=Array.from(document.querySelectorAll('tr[data-account-id]'));
-  var ok=rows.filter(function(row){{
-    var state=row.querySelector('.checkin-state');
-    return !!state&&state.textContent.trim()==='已签到';
-  }}).length;
-  var failed=rows.filter(function(row){{ return row.classList.contains('row-failed'); }}).length;
-  var summary=document.getElementById('checkin-summary');
-  if(summary) summary.textContent=(action||'已更新')+'：'+ok+' 已签到 / '+rows.length+' 个账号'+(failed?'，'+failed+' 个异常':'');
-  var updated=document.getElementById('checkin-updated');
-  if(updated) updated.textContent='更新于 '+new Date().toLocaleTimeString();
-  return {{ok:ok,failed:failed,total:rows.length}};
-}}
-function checkinFailureText(account){{
-  var code=responseCode(account&&account.data);
-  var message=(account&&account.error)||((account&&account.data&&account.data.message)||'未知错误');
-  return (account&&account.label||account&&account.id||'账号')+'：'+(code?'业务码 '+code+'，':'')+message;
-}}
-const CONN_PRESET = ['glm-5.3','glm-5.2','DeepSeek-V4-Pro-Official','DeepSeek-V4-Flash-Official'];
-function fillConnPreset(){{
-  document.getElementById('conn-models').value = CONN_PRESET.join(', ');
-}}
-function connModelList(){{
-  var raw = document.getElementById('conn-models').value || '';
-  var items = raw.split(/[\\n,]+/).map(function(s){{ return s.trim(); }}).filter(Boolean);
-  return items.length ? items : CONN_PRESET.slice();
-}}
-function connModes(){{
-  var modes = [];
-  if(document.getElementById('conn-mode-text').checked) modes.push('text');
-  if(document.getElementById('conn-mode-tool').checked) modes.push('tool');
-  return modes;
-}}
-function connRow(model, mode){{
-  var tr = document.createElement('tr');
-  tr.style.borderTop = '1px solid #2c303d';
-  var label = mode === 'tool' ? '工具调用' : '文本回复';
-  tr.innerHTML = '<td style="padding:6px 4px">' + model + '</td>'
-    + '<td style="padding:6px 4px">' + label + '</td>'
-    + '<td style="padding:6px 4px" class="conn-status">排队中</td>'
-    + '<td style="padding:6px 4px" class="conn-time">-</td>'
-    + '<td style="padding:6px 4px;color:#9aa0b0" class="conn-detail">-</td>';
-  return tr;
-}}
-async function runConnTest(){{
-  var btn = document.getElementById('conn-run-btn');
-  var table = document.getElementById('conn-table');
-  var tbody = document.getElementById('conn-tbody');
-  var summary = document.getElementById('conn-summary');
-  var models = connModelList();
-  var modes = connModes();
-  if(!modes.length){{ showMsg('conn-msg','请至少选择一种测试内容',false); return; }}
-  var timeout = parseInt(document.getElementById('conn-timeout').value,10) || 120;
-  btn.disabled = true;
-  table.style.display = 'table';
-  tbody.innerHTML = '';
-  showMsg('conn-msg','');
-  var jobs = [];
-  models.forEach(function(model){{
-    modes.forEach(function(mode){{
-      var tr = connRow(model, mode);
-      tbody.appendChild(tr);
-      jobs.push({{model: model, mode: mode, row: tr}});
-    }});
-  }});
-  var passed = 0, done = 0;
-  summary.textContent = '0/' + jobs.length + ' 完成';
-  for(var i = 0; i < jobs.length; i++){{
-    var job = jobs[i];
-    var statusCell = job.row.querySelector('.conn-status');
-    var timeCell = job.row.querySelector('.conn-time');
-    var detailCell = job.row.querySelector('.conn-detail');
-    statusCell.textContent = '测试中...';
-    statusCell.style.color = '#9aa0b0';
-    try{{
-      var d = await postJSON('/api/model-test',
-        {{model: job.model, mode: job.mode, timeout: timeout}}, (timeout + 20) * 1000);
-      timeCell.textContent = (d.elapsed_ms !== undefined ? d.elapsed_ms + ' ms' : '-');
-      if(d.success){{
-        passed++;
-        statusCell.textContent = '通过';
-        statusCell.style.color = '#4ade80';
-        if(job.mode === 'tool'){{
-          var names = (d.tool_calls || []).map(function(c){{ return c.name; }}).join(', ');
-          detailCell.textContent = 'tool=' + (names || '-')
-            + (d.provider_model_name ? ' | ' + d.provider_model_name : '');
-        }} else {{
-          detailCell.textContent = JSON.stringify(d.reply || '')
-            + (d.provider_model_name ? ' | ' + d.provider_model_name : '');
-        }}
-      }} else {{
-        statusCell.textContent = '失败';
-        statusCell.style.color = '#f87171';
-        detailCell.textContent = String(d.error || 'unknown');
-      }}
-    }}catch(e){{
-      statusCell.textContent = '失败';
-      statusCell.style.color = '#f87171';
-      timeCell.textContent = '-';
-      detailCell.textContent = String(e);
-    }}
-    done++;
-    summary.textContent = done + '/' + jobs.length + ' 完成，通过 ' + passed;
-  }}
-  btn.disabled = false;
-  var allOk = passed === jobs.length;
-  showMsg('conn-msg', '测试结束：' + passed + '/' + jobs.length + ' 通过', allOk);
-}}
-var ALLOWLIST_STATE = {{ allowed: [], all: [] }};
-async function refreshModels(){{
-  var el=document.getElementById('models-out');
-  var msg=document.getElementById('models-msg');
-  var addRow=document.getElementById('allowlist-add-row');
-  el.style.display='block';
-  el.textContent='加载中...';
-  try{{
-    var result=await requestJSON('/api/allowlist',{{method:'GET'}},45000);
-    var d=result.data;
-    if(!result.ok || !d || !d.success){{ throw new Error((d && d.error) || ('HTTP '+result.status)); }}
-    ALLOWLIST_STATE.allowed=(d.allowed||[]).slice().sort();
-    ALLOWLIST_STATE.all=(d.all||[]).slice();
-    renderAllowlist();
-    showMsg('models-msg','当前白名单 '+ALLOWLIST_STATE.allowed.length+' 个（全量目录 '+ALLOWLIST_STATE.all.length+' 个可选）',true,6000);
-  }}catch(e){{
-    el.textContent=String(e);
-    showMsg('models-msg',String(e),false);
-  }}
-}}
-function renderAllowlist(){{
-  var el=document.getElementById('models-out');
-  var addRow=document.getElementById('allowlist-add-row');
-  if(!ALLOWLIST_STATE.allowed.length){{
-    el.innerHTML='<div style="color:#9aa0b0;padding:8px 0">白名单为空——用下方下拉添加模型后保存</div>';
-  }}else{{
-    el.innerHTML=ALLOWLIST_STATE.allowed.map(function(mid){{
-      return '<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-family:inherit">'
-        +'<input type="checkbox" class="allowlist-box" data-id="'+mid+'" onchange="updateAllowlistCount()" checked>'
-        +'<span>'+mid+'</span></label>';
-    }}).join('');
-  }}
-  updateAllowlistCount();
-  if(addRow){{
-    var sel=document.getElementById('allowlist-add-select');
-    var have={{}};ALLOWLIST_STATE.allowed.forEach(function(m){{ have[m]=true; }});
-    var rest=ALLOWLIST_STATE.all.filter(function(m){{ return !have[String(m).toLowerCase()]; }}).sort();
-    sel.innerHTML=rest.length
-      ? rest.map(function(m){{ return '<option value="'+m+'">'+m+'</option>'; }}).join('')
-      : '<option value="">（全量目录已全部加入）</option>';
-    addRow.style.display=rest.length?'flex':'none';
-  }}
-}}
-function addAllowlistModel(){{
-  var sel=document.getElementById('allowlist-add-select');
-  var mid=sel&&sel.value;
-  if(!mid){{ showMsg('models-msg','没有可添加的模型了',false,4000); return; }}
-  ALLOWLIST_STATE.allowed.push(String(mid).toLowerCase());
-  renderAllowlist();
-}}
-function updateAllowlistCount(){{
-  var boxes=document.querySelectorAll('.allowlist-box');
-  var n=0;boxes.forEach(function(b){{ if(b.checked) n++; }});
-  var el=document.getElementById('allowlist-count');
-  if(el) el.textContent='已选 '+n;
-}}
-async function saveAllowlist(){{
-  var btn=document.getElementById('allowlist-save-btn');
-  var ids=[];
-  document.querySelectorAll('.allowlist-box').forEach(function(b){{ if(b.checked) ids.push(b.getAttribute('data-id')); }});
-  if(btn) btn.disabled=true;
-  try{{
-    var d=await postJSON('/api/allowlist',{{ids:ids}},30000);
-    if(!d.success){{ throw new Error(d.error||'保存失败'); }}
-    ALLOWLIST_STATE.allowed=(d.ids||ids).slice().sort();
-    renderAllowlist();
-    showMsg('models-msg','白名单已保存：'+d.count+' 个模型，立即生效',true,6000);
-  }}catch(e){{
-    showMsg('models-msg',String(e),false);
-  }}finally{{ if(btn) btn.disabled=false; }}
-}}
-async function logout(){{
-  var d=await postJSON('/api/logout',{{}});
-  showMsg('auth-msg',d.success?'已登出':(d.error||'登出失败'),d.success);
-  if(d.success) setTimeout(function(){{ location.reload(); }},600);
-}}
-async function stopService(){{
-  if(!confirm('确定要停止 Trae CN Relay 服务吗？\\n\\n停止后需手动运行 start-trae2api.cmd 重新启动。')) return;
-  try{{
-    var d=await postJSON('/api/stop',{{}});
-    if(d&&d.ok) showMsg('auth-msg','正在停止服务…请用 start-trae2api.cmd 手动恢复',true,8000);
-    else showMsg('auth-msg',(d&&d.error)||'停止失败',false);
-  }}catch(e){{
-    showMsg('auth-msg',String(e),false);
-  }}
-}}
-async function switchAccount(id){{
-  var row=document.getElementById('row-'+id);
-  if(row&&row.classList.contains('active-row')){{ showMsg('account-msg','该账号已是当前账号，无需切换',true,5000); return; }}
-  setSwitchBusy(true);
-  try{{
-    var d=await postJSON('/api/accounts/switch',{{account_id:id}},30000);
-    if(!d.success){{ showMsg('account-msg',d.error||'切换失败',false); return; }}
-    setActiveAccount(d.active||id,d.account||{{id:id}});
-    showMsg('account-msg','已切换到账号 '+String((d.account&&(d.account.label||d.account.user_id))||id),true,6000);
-  }}finally{{ setSwitchBusy(false); }}
-}}
-async function removeAccount(id){{
-  if(!confirm('确定删除该账号？')) return;
-  var d=await postJSON('/api/accounts/remove',{{account_id:id}});
-  if(d.success) location.reload(); else showMsg('auth-msg',d.error||'删除失败',false);
-}}
-async function togglePolling(){{
-  var on=document.getElementById('poll-toggle').checked;
-  var mode=document.querySelector('input[name=poll-mode]:checked');
-  var modeVal=mode?mode.value:'round-robin';
-  var d=await postJSON('/api/polling',{{enabled:on,mode:modeVal}});
-  if(d.success) location.reload();
-  else showMsg('auth-msg',d.error||'操作失败',false);
-}}
-async function saveSettings(){{
-  var web=document.getElementById('settings-web').value.trim();
-  var port=document.getElementById('settings-port').value.trim();
-  var d=await postJSON('/api/settings',{{web_base_url:web,relay_port:port}});
-  if(d.success){{ showMsg('settings-msg',d.note||'设置已保存',true); setTimeout(function(){{ location.reload(); }},800); }}
-  else showMsg('settings-msg',d.error||'保存失败',false);
-}}
-async function checkinRefreshAll(){{
-  setBusy(true);
-  try{{
-    var result=await requestJSON('/api/checkin/accounts',{{method:'GET'}},20000);
-    var d=result.data;
-    if(!result.ok||!d||!d.success){{ throw new Error(apiError(d,result.status)); }}
-    var accounts=d.accounts||[];
-    accounts.forEach(updateAccountCheckinRow);
-    var summary=updateCheckinSummary(accounts,'签到状态查询完成');
-    var failures=accounts.filter(function(a){{ return a.error; }});
-    if(failures.length){{
-      showMsg('checkin-msg','签到状态查询完成，但有 '+failures.length+' 个账号失败：\\n'+failures.slice(0,3).map(checkinFailureText).join('\\n'),false,12000);
-    }}else{{
-      showMsg('checkin-msg','签到状态查询成功，已刷新 '+summary.total+' 个账号',true,3000);
-    }}
-  }}catch(e){{ showMsg('checkin-msg',String(e),false,12000); }}
-  finally{{ setBusy(false); }}
-}}
-async function creditsRefreshAll(){{
-  setBusy(true);
-  try{{
-    var result=await requestJSON('/api/checkin/credits/accounts',{{method:'GET'}},20000);
-    var d=result.data;
-    if(!result.ok||!d||!d.success){{ throw new Error(apiError(d,result.status)); }}
-    var accounts=d.accounts||[];
-    accounts.forEach(updateAccountCreditsRow);
-    var failures=accounts.filter(function(a){{ return a.error; }});
-    var summary=document.getElementById('checkin-summary');
-    if(summary) summary.textContent='积分查询完成：'+(accounts.length-failures.length)+' / '+accounts.length+' 个账号'+(failures.length?'，'+failures.length+' 个异常':'');
-    var updated=document.getElementById('checkin-updated');
-    if(updated) updated.textContent='更新于 '+new Date().toLocaleTimeString();
-    if(failures.length){{
-      showMsg('checkin-msg','积分查询完成，但有 '+failures.length+' 个账号失败：\\n'+failures.slice(0,3).map(checkinFailureText).join('\\n'),false,12000);
-    }}else{{
-      showMsg('checkin-msg','积分查询成功，已刷新 '+accounts.length+' 个账号',true,3000);
-    }}
-  }}catch(e){{ showMsg('checkin-msg',String(e),false,12000); }}
-  finally{{ setBusy(false); }}
-}}
-async function checkinAccount(id){{
-  setAccountCheckinBusy(id,true);
-  try{{
-    var result=await requestJSON('/api/checkin/account/'+encodeURIComponent(id),{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}},90000);
-    var d=result.data||{{}};
-    var account={{id:id,data:d.data,checked_in:d.checked_in,account_credits:d.account_credits,work_credits:d.work_credits,total_credits:d.total_credits,success:d.success,error:d.success?'':apiError(d,result.status)}};
-    updateAccountRow(account);
-    if(!result.ok||!d||!d.success){{ showMsg('checkin-msg','账号 '+id+' 签到失败：'+apiError(d,result.status),false,12000); return; }}
-    account.checked_in=true;
-    account.error='';
-    updateAccountRow(account);
-    updateVisibleCheckinSummary('签到完成');
-    showMsg('checkin-msg',d.skipped?'账号 '+id+' 已签到，无需重复操作':'账号 '+id+' 签到成功（业务码 '+(responseCode(d)||'0')+'）',true,3000);
-  }}catch(e){{ showMsg('checkin-msg',String(e),false,12000); }}
-  finally{{ setAccountCheckinBusy(id,false); }}
-}}
-async function checkinClaimAll(){{
-  if(!confirm('确定按顺序逐个对所有账号签到？')) return;
-  setBusy(true);
-  try{{
-    var accountCount=document.querySelectorAll('tr[data-account-id]').length;
-    var timeoutMs=Math.max(900000,(accountCount+1)*({CHECKIN_INTERVAL}+5)*1000);
-    var result=await requestJSON('/api/checkin/claim-all',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}},timeoutMs);
-    var d=result.data;
-    if(!result.ok||!d||!d.success){{ throw new Error(apiError(d,result.status)); }}
-    var accounts=d.accounts||[];
-    accounts.forEach(updateAccountRow);
-    var summary=updateCheckinSummary(accounts,'轮询完成');
-    if(summary.failed){{
-      showMsg('checkin-msg','轮询完成：'+summary.failed+' 个账号失败\\n'+accounts.filter(function(a){{return a.error||a.success===false;}}).slice(0,5).map(checkinFailureText).join('\\n'),false,12000);
-    }}else{{
-      showMsg('checkin-msg','轮询签到成功，'+summary.ok+' 个账号已签到',true,3000);
-    }}
-  }}catch(e){{ showMsg('checkin-msg',String(e),false,12000); }}
-  finally{{ setBusy(false); }}
-}}
-document.getElementById('manual-form').addEventListener('submit',async function(e){{
-  e.preventDefault();var fd=new FormData(e.target);
-  var payload={{}};
-  for(var[k,v]of fd.entries())if(v)payload[k]=v;
-  var d=await postJSON('/api/web-auth',payload);
-  showMsg('manual-msg',d.success?'账号已添加':d.error||'提交失败',d.success);
-  if(d.success) setTimeout(function(){{ location.reload(); }},600);
-}});
-</script>
-</body>
-</html>"""
+    The page is plain HTML/JS talking to the JSON admin API; only runtime values
+    are substituted here.  Keeping the script out of f-strings avoids the escape
+    hazard class of bugs (a literal ``\n`` inside a JS regex used to break the
+    whole ``<script>`` block and kill every button).
+    """
+    template_path = Path(__file__).resolve().parent / "web" / "admin.html"
+    html = template_path.read_text("utf-8")
+    api_key = API_KEYS[0] if API_KEYS else ""
+    values = {
+        "UPSTREAM_MODE": html_mod.escape(UPSTREAM_MODE),
+        "LISTENER_PORT": str(LOCAL_LISTENER_PORT),
+        "CLIENT_ID": html_mod.escape(TRAE_CLIENT_ID),
+        "AUTH_URL": html_mod.escape(TRAE_AUTH_URL),
+        "API_KEY": html_mod.escape(api_key or "未设置"),
+        "CHECKIN_INTERVAL": str(int(CHECKIN_INTERVAL)),
+    }
+    for key, value in values.items():
+        html = html.replace("{{" + key + "}}", value)
+    return html
 
 
 def _oauth_result_html(success: bool, message: str, login_trace_id: str = "") -> str:
@@ -4344,6 +3325,198 @@ async def _run_web_with_retry(
     return await run_web_session(messages, model, stream, options)
 
 
+async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] = None):
+    """SOLO ``llm_utils_chat`` channel: native tools and structured tool_calls.
+
+    The upstream accepts OpenAI tool schemas directly and streams tool calls as
+    structured ``event:output.tool_calls`` fragments, so this path never uses the
+    text prompt bridge.  One account is bounded by a concurrency gate and a
+    failed turn is never replayed automatically (replays would double-bill).
+    """
+    options = dict(options or {})
+    request_id = str(options.get("_relay_request_id") or "")
+    account_id = str(options.get("_account_id") or "").strip()
+    token = str(options.get("_auth_token") or "").strip()
+    if not token and account_id:
+        token = str((auth.get_account_record(account_id) or {}).get("token") or "").strip()
+    if not token and not account_id:
+        token = str(auth.get_token() or "").strip()
+    token_identity = _account_id_from_token(token)
+    if token_identity:
+        account_id = token_identity
+    if not account_id:
+        account_id = str(auth.get_active_account_id() or "default")
+    record = auth.get_account_record(account_id) if account_id else {}
+    if not token:
+        token = str(record.get("token") or "").strip()
+    if not token:
+        raise RuntimeError("No Cloud-IDE-JWT token available")
+    user_id = str(record.get("user_id") or account_id or "")
+    body = trae_solo.build_solo_body(
+        messages,
+        model,
+        tools=options.get("tools"),
+        tool_choice=options.get("tool_choice"),
+        max_tokens=options.get("max_tokens") or options.get("max_completion_tokens"),
+        session_id=str(options.get("session_id") or options.get("sessionId") or ""),
+    )
+    logger.info(
+        "solo chat start id=%s account=%s model=%s messages=%d tools=%d history_tool_msgs=%d",
+        request_id,
+        account_id,
+        model,
+        len(messages or []),
+        len(body.get("tools") or []),
+        sum(1 for m in (messages or []) if isinstance(m, Mapping) and m.get("role") == "tool"),
+    )
+    gate = await trae_solo.account_gate(account_id)
+    client = httpx.AsyncClient(timeout=None)
+    released = False
+
+    async def release() -> None:
+        # The streaming response outlives this function: the HTTP client and the
+        # account gate must stay alive until the generator finishes consuming.
+        nonlocal released
+        if released:
+            return
+        released = True
+        await client.aclose()
+        gate.release()
+
+    await gate.acquire()
+    try:
+        event_iter = trae_solo.stream_events(client, token, user_id, body)
+        if stream:
+            async def gen():
+                prefix_id = make_id()
+                accumulator = ToolCallAccumulator()
+                usage = None
+                final_reason = "stop"
+                chunk_count = 0
+                tool_chunk_count = 0
+                started_at = time.monotonic()
+                stream_status = "running"
+                try:
+                    yield openai_chunk(prefix_id, model, {"role": "assistant"})
+                    async for event, data in event_iter:
+                        evt = str(event or "").lower()
+                        if evt == "output":
+                            response = data.get("response")
+                            if isinstance(response, str) and response:
+                                chunk_count += 1
+                                yield openai_chunk(prefix_id, model, {"content": response})
+                            reasoning = data.get("reasoning_content")
+                            if isinstance(reasoning, str) and reasoning:
+                                chunk_count += 1
+                                yield openai_chunk(
+                                    prefix_id, model, {"reasoning_content": reasoning}
+                                )
+                            raw_calls = data.get("tool_calls")
+                            if isinstance(raw_calls, list) and raw_calls:
+                                for delta in accumulator.add(raw_calls):
+                                    tool_chunk_count += 1
+                                    yield openai_chunk(
+                                        prefix_id, model, {"tool_calls": [delta]}
+                                    )
+                        elif evt == "token_usage":
+                            usage = _map_usage(data.get("usage") or data)
+                        elif evt == "done":
+                            final_reason = (
+                                _finish_reason(
+                                    _payload_finish_reason(data),
+                                    accumulator.has_calls,
+                                )
+                                or final_reason
+                            )
+                            break
+                        elif evt == "error":
+                            raise trae_solo.classify_payload_error(data) or (
+                                trae_solo.SoloUpstreamError(
+                                    f"SOLO stream error: {str(data)[:200]}"
+                                )
+                            )
+                    if accumulator.has_calls:
+                        final_reason = "tool_calls"
+                    if FORWARD_USAGE and usage:
+                        usage_chunk = openai_chunk(prefix_id, model, {}, usage=usage)
+                        _track_usage_from_chunk(usage_chunk, model)
+                        yield usage_chunk
+                    yield openai_chunk(prefix_id, model, {}, finish_reason=final_reason)
+                    yield "data: [DONE]\n\n"
+                    stream_status = "completed"
+                except asyncio.CancelledError:
+                    stream_status = "client_cancelled"
+                    raise
+                except GeneratorExit:
+                    stream_status = "client_closed"
+                    raise
+                except trae_solo.SoloUpstreamError:
+                    stream_status = "upstream_error"
+                    raise
+                except Exception:
+                    stream_status = "error"
+                    raise
+                finally:
+                    logger.info(
+                        "solo stream closed id=%s status=%s chunks=%d tool_chunks=%d "
+                        "elapsed_ms=%d",
+                        request_id,
+                        stream_status,
+                        chunk_count,
+                        tool_chunk_count,
+                        int((time.monotonic() - started_at) * 1000),
+                    )
+                    await release()
+
+            return StreamingResponse(
+                gen(), media_type="text/event-stream", headers=_sse_headers()
+            )
+
+        # Non-streaming: aggregate one chat.completion from the same events.
+        accumulator = ToolCallAccumulator()
+        text_parts: list[str] = []
+        usage = None
+        final_reason = "stop"
+        async for event, data in event_iter:
+            evt = str(event or "").lower()
+            if evt == "output":
+                response = data.get("response")
+                if isinstance(response, str) and response:
+                    text_parts.append(response)
+                raw_calls = data.get("tool_calls")
+                if isinstance(raw_calls, list) and raw_calls:
+                    accumulator.add(raw_calls)
+            elif evt == "token_usage":
+                usage = _map_usage(data.get("usage") or data)
+            elif evt == "done":
+                final_reason = (
+                    _finish_reason(
+                        _payload_finish_reason(data), accumulator.has_calls
+                    )
+                    or final_reason
+                )
+                break
+            elif evt == "error":
+                raise trae_solo.classify_payload_error(data) or (
+                    trae_solo.SoloUpstreamError(f"SOLO stream error: {str(data)[:200]}")
+                )
+        if accumulator.has_calls:
+            final_reason = "tool_calls"
+        result = openai_completion(
+            make_id(),
+            model,
+            "".join(text_parts) or None,
+            finish_reason=final_reason,
+            usage=usage,
+            tool_calls=accumulator.calls() or None,
+        )
+        _track_usage_from_result(result, model)
+        return JSONResponse(content=result)
+    except BaseException:
+        await release()
+        raise
+
+
 async def _run_remote_with_retry(
     messages,
     model,
@@ -4659,9 +3832,11 @@ async def _dispatch_chat(messages, model, stream: bool, options: Optional[dict] 
     # diagnostics, but they are never silent fallbacks for API traffic.
     errors = []
     modes = []
-    if UPSTREAM_MODE == "cli":
+    if UPSTREAM_MODE in ("solo", "solo-lite", "llm_utils_chat"):
+        modes = ["solo"]
+    elif UPSTREAM_MODE == "cli":
         modes = ["cli"]
-    elif UPSTREAM_MODE in ("raw", "direct"):
+    elif UPSTREAM_MODE in ("raw", "direct", "auto"):
         modes = ["raw"]
     elif UPSTREAM_MODE in ("remote", "9router", "trae-remote"):
         modes = ["remote"]
@@ -4672,7 +3847,7 @@ async def _dispatch_chat(messages, model, stream: bool, options: Optional[dict] 
     elif UPSTREAM_MODE in ("traework-native", "native", "traework"):
         modes = ["traework-native"]
     else:
-        modes = ["raw"]
+        modes = ["solo"]
 
     logger.info(
         "dispatch route id=%s mode=%s candidates=%s tool_protocol=%s",
@@ -4690,9 +3865,11 @@ async def _dispatch_chat(messages, model, stream: bool, options: Optional[dict] 
             # Web and remote routes must receive the lease-bound credential;
             # otherwise a concurrent account switch can make the upstream bill
             # one token while the usage tracker records another.
-            if mode not in ("remote", "web", "ide", "traework-native"):
+            if mode not in ("solo", "remote", "web", "ide", "traework-native"):
                 mode_options.pop("_auth_token", None)
                 mode_options.pop("_account_id", None)
+            if mode == "solo":
+                return await run_solo_chat(messages, model, stream, mode_options)
             if mode == "cli":
                 return await run_cli_chat(messages, model, stream, mode_options)
             if mode == "web":
@@ -5178,9 +4355,21 @@ async def api_allowlist_post(req: Request):
 
 @app.get("/v1/models")
 async def models(request: Request):
-    force = request.query_params.get("refresh", "").lower() in ("1", "true", "yes")
+    force = request.query_params.get("refresh", "").lower() in {"1", "true", "yes"}
     try:
-        items = await trae_client.get_models(force=force)
+        if UPSTREAM_MODE in ("solo", "solo-lite", "llm_utils_chat"):
+            account_id = str(auth.get_active_account_id() or "default")
+            record = auth.get_account_record(account_id) or {}
+            token = str(record.get("token") or auth.get_token() or "").strip()
+            if not token:
+                raise RuntimeError("No Cloud-IDE-JWT token available")
+            user_id = str(record.get("user_id") or account_id or "")
+            async with httpx.AsyncClient(timeout=None) as client:
+                items = await trae_solo.get_models(
+                    client, token, user_id, force=force
+                )
+        else:
+            items = await trae_client.get_models(force=force)
     except Exception as e:
         return _openai_error(502, str(e), "api_error")
     if MODEL_ALLOWLIST:

@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trae2API · 控制台</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><path d='M9 22V10h10v3h-6.5v2.2H18v3h-5.5V19H19v3z' fill='white'/></svg>">
+<style>
+:root{
+  --bg:#f6f7fa; --card:#ffffff; --soft:#f8fafc; --soft2:#f2f4f8;
+  --line:#e7eaf0; --line2:#d8dde6;
+  --txt:#111827; --dim:#6b7280; --dim2:#9ca3af;
+  --ok:#059669; --warn:#d97706; --err:#dc2626; --acc:#4f46e5;
+  --mono:"JetBrains Mono",Consolas,"Cascadia Mono",monospace;
+  --radius:12px;
+  --shadow:0 1px 2px rgba(16,24,40,.05);
+  --shadow-lg:0 4px 16px rgba(16,24,40,.08);
+  --sidew:232px;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+html,body{margin:0;color:var(--txt);font:14px/1.6 "Segoe UI","Noto Sans SC","Microsoft YaHei",sans-serif}
+body{min-height:100vh;background:var(--bg)}
+::selection{background:#dbe4ff}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#d3d9e3;border-radius:8px;border:2.5px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#bcc4d2}
+
+/* ───── sidebar ───── */
+.side{position:fixed;top:0;left:0;bottom:0;width:var(--sidew);z-index:30;display:flex;flex-direction:column;
+  background:var(--card);border-right:1px solid var(--line)}
+.sbrand{display:flex;align-items:center;gap:10px;padding:18px 16px 15px}
+.sbrand .logo{width:34px;height:34px;border-radius:9px;background:var(--acc);color:#fff;display:flex;
+  align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none}
+.sbrand .t{min-width:0}
+.sbrand .t b{display:block;font-size:15px;font-weight:700;letter-spacing:.2px;line-height:1.35}
+.sstatus{display:inline-flex;align-items:center;gap:6px;color:var(--dim);font-size:11.5px;line-height:1.4}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:none;
+  box-shadow:0 0 0 3px rgba(5,150,105,.14);animation:breathe 2.4s ease-in-out infinite}
+.dot.err{background:var(--err);box-shadow:0 0 0 3px rgba(220,38,38,.14)}
+@keyframes breathe{50%{opacity:.5}}
+.snav{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+.navitem{display:flex;align-items:center;gap:10px;padding:8.5px 12px;border-radius:9px;color:#4b5563;
+  font-size:13.5px;font-weight:500;line-height:1.4;white-space:nowrap;text-decoration:none;cursor:pointer;
+  transition:background .12s ease,color .12s ease;border:0;background:none;font-family:inherit;width:100%;text-align:left}
+.navitem:hover{background:var(--soft);color:var(--txt)}
+.navitem.active{background:#eef2ff;color:#4338ca;font-weight:600}
+.navitem.red{color:var(--err)}
+.navitem.red:hover{background:#fef2f2;color:#b91c1c}
+.sfoot{padding:10px 12px 14px;border-top:1px solid var(--soft2);display:flex;flex-direction:column;gap:8px}
+.sfoot .kv{font-size:11px;color:var(--dim2);font-family:var(--mono);word-break:break-all;line-height:1.5}
+.sfoot .kv b{color:var(--dim);font-weight:600}
+
+/* ───── main ───── */
+.main{margin-left:var(--sidew);min-height:100vh}
+.wrap{max-width:1200px;margin:0 auto;padding:0 28px 56px}
+.view{display:none}
+.view.on{display:block}
+.pagehead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:26px 2px 18px}
+.pagehead h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.2px}
+.pagehead .desc{color:var(--dim2);font-size:12.5px;font-family:var(--mono)}
+.pagehead .acts{margin-left:auto;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+
+/* ───── buttons ───── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;flex:none;
+  background:var(--card);border:1px solid var(--line2);color:#374151;border-radius:8px;
+  padding:7px 14px;cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;
+  transition:all .15s ease}
+.btn:hover{border-color:#b9c2d0;background:var(--soft);color:var(--txt);box-shadow:var(--shadow)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:#18181b;border-color:#18181b;color:#fff}
+.btn.primary:hover{background:#27272a;border-color:#27272a;color:#fff;box-shadow:0 3px 10px rgba(24,24,27,.25)}
+.btn.done{background:var(--soft);border-color:var(--line);color:#9aa3af;cursor:default;box-shadow:none}
+.btn.danger{color:var(--err)}
+.btn.danger:hover{border-color:#fca5a5;background:#fef2f2;color:#b91c1c}
+.btn[disabled]{opacity:.45;cursor:not-allowed;pointer-events:none}
+.btn.loading{position:relative;color:transparent!important}
+.btn.loading::after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;
+  border:2px solid #cbd2dd;border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+select.btn,input.kinput{font-family:inherit}
+input.kinput,select.kinput,textarea.kinput{background:var(--card);border:1px solid var(--line2);color:var(--txt);
+  border-radius:8px;padding:7px 11px;font-size:13px;font-family:var(--mono)}
+input.kinput:focus,select.kinput:focus,textarea.kinput:focus{outline:none;border-color:var(--acc);
+  box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+
+/* ───── stat cards ───── */
+.grid4{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px;margin-bottom:16px}
+.ucard{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow);transition:all .16s ease}
+.ucard:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.ucard .ic{width:42px;height:42px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;
+  background:#eef2ff;color:var(--acc);font-size:19px;font-weight:700}
+.ucard .ic.green{background:#ecfdf5;color:var(--ok)}
+.ucard .ic.amber{background:#fffbeb;color:var(--warn)}
+.ucard .ic.purple{background:#f5f3ff;color:#7c3aed}
+.ucard .body{min-width:0}
+.ucard .k{color:var(--dim);font-size:12px;font-weight:500}
+.ucard .v{font-size:23px;font-weight:700;margin-top:1px;font-family:var(--mono);
+  font-variant-numeric:tabular-nums;line-height:1.3;letter-spacing:-.4px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ucard .s{color:var(--dim2);font-size:11px;font-family:var(--mono);margin-top:1px}
+
+/* ───── section cards ───── */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px 18px;min-width:0;box-shadow:var(--shadow);margin-bottom:16px}
+.card h2{font-size:12px;font-weight:600;color:var(--dim);margin:0 0 13px;display:flex;align-items:center;gap:7px;
+  text-transform:uppercase;letter-spacing:.6px}
+.card h2 .hint{margin-left:auto;color:var(--dim2);font-size:11px;font-weight:400;letter-spacing:0;text-transform:none}
+.rowline{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+
+/* ───── tags & badges ───── */
+.tag{display:inline-block;padding:1.5px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.tag.ok{background:#ecfdf5;color:var(--ok)}
+.tag.cool{background:#fffbeb;color:var(--warn)}
+.tag.bad{background:#fef2f2;color:var(--err)}
+.tag.info{background:#eef2ff;color:#4338ca}
+.tag.new{background:#f5f3ff;color:#7c3aed}
+.badge{display:inline-block;min-width:30px;text-align:center;padding:1px 7px;border-radius:6px;
+  font-family:var(--mono);font-size:11px;font-weight:600}
+.badge.ok{color:var(--ok);background:#ecfdf5}
+.badge.bad{color:var(--err);background:#fef2f2}
+
+/* ───── account cards ───── */
+.acctgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:13px}
+.acard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px 17px;
+  box-shadow:var(--shadow);transition:all .16s ease;display:flex;flex-direction:column;gap:10px}
+.acard:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.acard.active{border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,70,229,.12),var(--shadow-lg)}
+.acard .top{display:flex;align-items:center;gap:11px}
+.acard .avatar{width:40px;height:40px;border-radius:11px;flex:none;display:flex;align-items:center;
+  justify-content:center;font-weight:700;font-size:15px;color:#fff}
+.acard .who{min-width:0;flex:1}
+.acard .who b{display:block;font-size:14px;font-weight:650;line-height:1.4;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.acard .who span{color:var(--dim2);font-size:11px;font-family:var(--mono)}
+.acard .credits{display:flex;gap:8px;flex-wrap:wrap}
+.acard .mini-kv{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:5px 10px;min-width:96px}
+.acard .mini-kv .k{color:var(--dim2);font-size:10.5px;font-weight:500}
+.acard .mini-kv .v{font-family:var(--mono);font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.acard .acts{display:flex;gap:7px;flex-wrap:wrap}
+.acard .acts .btn{padding:5px 11px;font-size:12px}
+
+/* ───── table ───── */
+.tablewrap{overflow:auto;max-height:680px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{position:sticky;top:0;background:var(--soft);color:var(--dim);font-weight:600;font-size:11px;
+  letter-spacing:.5px;text-transform:uppercase;padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);z-index:1}
+tbody td{padding:9px 12px;border-bottom:1px solid var(--soft2);vertical-align:middle}
+tbody tr:hover{background:#fafbff}
+tbody tr:last-child td{border-bottom:0}
+td.mono,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.empty{padding:34px 12px;text-align:center;color:var(--dim2);font-size:13px}
+
+/* ───── model chips ───── */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:7px;background:var(--soft);border:1px solid var(--line2);
+  border-radius:8px;padding:5px 11px;font-family:var(--mono);font-size:12px}
+.chip .x{cursor:pointer;color:var(--dim2);font-weight:700;padding:0 2px}
+.chip .x:hover{color:var(--err)}
+
+/* ───── toast ───── */
+.toast{position:fixed;top:18px;right:18px;z-index:80;min-width:250px;max-width:380px;
+  background:var(--card);border:1px solid var(--line);border-left:4px solid var(--ok);
+  border-radius:10px;padding:12px 16px;box-shadow:var(--shadow-lg);
+  opacity:0;transform:translateY(-10px);transition:all .22s ease;pointer-events:none}
+.toast.visible{opacity:1;transform:none}
+.toast.error{border-left-color:var(--err)}
+.toast b{display:block;font-size:13px;margin-bottom:2px}
+.toast span{color:var(--dim);font-size:12.5px;word-break:break-all}
+.msg{font-size:12px;min-height:18px;margin-top:6px}
+.msg-ok{color:var(--ok)}
+.msg-err{color:var(--err)}
+
+/* ───── misc ───── */
+.note{color:var(--dim2);font-size:12px}
+.note code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:var(--mono);font-size:11.5px}
+hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
+.conn-detail{max-width:380px;word-break:break-all;font-family:var(--mono);font-size:11px;color:var(--dim)}
+@media (max-width:960px){
+  .main{margin-left:0}
+  .wrap{padding:0 14px 40px}
+}
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <div class="sbrand">
+    <div class="logo">T</div>
+    <div class="t">
+      <b>Trae2API</b>
+      <div class="sstatus"><span class="dot" id="side-dot"></span><span id="side-status">连接中…</span></div>
+    </div>
+  </div>
+  <nav class="snav">
+    <button class="navitem active" data-view="overview">概览</button>
+    <button class="navitem" data-view="accounts">账号</button>
+    <button class="navitem" data-view="models">模型白名单</button>
+    <button class="navitem" data-view="usage">消费记录</button>
+    <button class="navitem" data-view="conn">连接测试</button>
+    <button class="navitem" data-view="settings">设置</button>
+  </nav>
+  <div class="sfoot">
+    <div class="kv"><b>上游模式</b> <span id="foot-mode">{{UPSTREAM_MODE}}</span></div>
+    <div class="kv"><b>API Key</b> <span id="foot-key">{{API_KEY}}</span></div>
+  </div>
+</aside>
+
+<main class="main">
+<div class="wrap">
+
+  <!-- ============ overview ============ -->
+  <section class="view on" id="view-overview">
+    <div class="pagehead">
+      <h1>概览</h1>
+      <div class="desc">Trae CN SOLO 通道 · OpenAI 兼容</div>
+      <div class="acts">
+        <button class="btn" id="ov-refresh">刷新状态</button>
+        <button class="btn primary" id="ov-checkin">全部签到</button>
+      </div>
+    </div>
+    <div class="grid4">
+      <div class="ucard"><div class="ic green">✓</div><div class="body">
+        <div class="k">服务状态</div><div class="v" id="ov-health">—</div>
+        <div class="s" id="ov-health-sub">127.0.0.1:{{LISTENER_PORT}}</div></div></div>
+      <div class="ucard"><div class="ic">⇄</div><div class="body">
+        <div class="k">上游通道</div><div class="v" id="ov-mode" style="font-size:16px">—</div>
+        <div class="s">llm_utils_chat · 原生工具调用</div></div></div>
+      <div class="ucard"><div class="ic purple">✦</div><div class="body">
+        <div class="k">可用积分</div><div class="v" id="ov-credits">—</div>
+        <div class="s" id="ov-credits-sub">全部为通用积分</div></div></div>
+      <div class="ucard"><div class="ic amber">◉</div><div class="body">
+        <div class="k">账号</div><div class="v" id="ov-accounts">—</div>
+        <div class="s" id="ov-accounts-sub">点击「账号」管理</div></div></div>
+    </div>
+    <div class="card">
+      <h2>快捷操作</h2>
+      <div class="rowline">
+        <button class="btn primary" id="quick-auth">授权登录新账号</button>
+        <button class="btn" id="quick-conn">跑一次连接测试</button>
+        <button class="btn" id="quick-models">刷新模型列表</button>
+        <button class="btn" id="quick-usage">查看消费记录</button>
+      </div>
+      <div class="msg" id="overview-msg"></div>
+    </div>
+    <div class="card">
+      <h2>最近消费 <span class="hint">最新 5 条</span></h2>
+      <div class="tablewrap" style="max-height:280px">
+        <table>
+          <thead><tr><th>时间</th><th>模型</th><th>产品端</th><th>积分</th><th>耗时</th></tr></thead>
+          <tbody id="ov-usage-body"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ accounts ============ -->
+  <section class="view" id="view-accounts">
+    <div class="pagehead">
+      <h1>账号</h1>
+      <div class="desc">cookie 仅本地使用 · round-robin 可轮换</div>
+      <div class="acts">
+        <button class="btn primary" id="acct-auth">授权登录</button>
+        <button class="btn" id="acct-refresh">刷新积分</button>
+        <button class="btn" id="acct-checkin">全部签到</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>网页授权登录</h2>
+      <div class="rowline">
+        <button class="btn primary" id="auth-btn">使用 Trae 网页授权登录</button>
+        <a class="btn" id="bat-link" style="display:none" href="/web/login/download?as=bat">下载一键启动 start_auth.bat</a>
+      </div>
+      <div class="msg" id="auth-msg"></div>
+      <div class="note" style="margin-top:8px">授权回调固定为 <code>http://127.0.0.1:{{LISTENER_PORT}}/authorize</code>，
+        需本机助手在线（双击 start_auth.bat）。凭据只写入本机 data/accounts.json。</div>
+    </div>
+    <div class="card">
+      <h2>手动添加凭证 <span class="hint">已有 token 时直接粘贴</span></h2>
+      <div class="rowline" style="margin-bottom:9px">
+        <input class="kinput" id="manual-token" placeholder="token (必填)" style="min-width:320px">
+        <input class="kinput" id="manual-refresh" placeholder="refresh_token (可选)" style="min-width:220px">
+        <input class="kinput" id="manual-user-id" placeholder="user_id (可选)" style="width:170px">
+      </div>
+      <div class="rowline">
+        <input class="kinput" id="manual-host" placeholder="host (可选，默认官方)" style="min-width:260px">
+        <input class="kinput" id="manual-label" placeholder="标签 (可选)" style="width:150px">
+        <button class="btn primary" id="manual-add">添加账号</button>
+      </div>
+      <div class="msg" id="manual-msg"></div>
+    </div>
+    <div class="acctgrid" id="acct-grid"><div class="empty">加载中…</div></div>
+    <div class="msg" id="account-msg"></div>
+  </section>
+
+  <!-- ============ models ============ -->
+  <section class="view" id="view-models">
+    <div class="pagehead">
+      <h1>模型白名单</h1>
+      <div class="desc">只有勾选的模型会暴露给 /v1</div>
+      <div class="acts">
+        <button class="btn" id="models-refresh">刷新模型列表</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>白名单 <span class="hint" id="allow-count"></span></h2>
+      <div class="chips" id="allow-chips"><span class="note">加载中…</span></div>
+      <hr class="sep">
+      <div class="rowline">
+        <select class="kinput" id="allow-select" style="min-width:280px"><option>加载中…</option></select>
+        <button class="btn primary" id="allow-add">添加到白名单</button>
+        <button class="btn" id="allow-save">保存白名单</button>
+      </div>
+      <div class="msg" id="allow-msg"></div>
+    </div>
+    <div class="card">
+      <h2>模型目录 <span class="hint">窗口 / 费率来自上游 get_detail_param</span></h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>模型 ID</th><th>显示名</th><th>上下文</th><th>能力</th><th>积分费率</th><th></th></tr></thead>
+          <tbody id="models-body"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ usage ============ -->
+  <section class="view" id="view-usage">
+    <div class="pagehead">
+      <h1>消费记录</h1>
+      <div class="desc">按请求计 · 含首字耗时</div>
+      <div class="acts">
+        <button class="btn primary" id="usage-refresh">刷新</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>明细</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>时间</th><th>模型</th><th>产品端</th><th>状态</th><th>输入</th><th>输出</th><th>积分</th><th>首字</th><th>耗时</th></tr></thead>
+          <tbody id="usage-body"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="msg" id="usage-msg"></div>
+    </div>
+  </section>
+
+  <!-- ============ connectivity ============ -->
+  <section class="view" id="view-conn">
+    <div class="pagehead">
+      <h1>连接测试</h1>
+      <div class="desc">走真实 dispatch 路径 · 工具测试用小额度</div>
+    </div>
+    <div class="card">
+      <h2>测试参数</h2>
+      <div class="rowline" style="margin-bottom:10px">
+        <label class="note">模型</label>
+        <select class="kinput" id="conn-model" style="min-width:240px"><option>加载中…</option></select>
+        <label class="note">超时(秒)</label>
+        <input class="kinput" id="conn-timeout" value="120" style="width:80px">
+      </div>
+      <div class="rowline">
+        <label class="note"><input type="checkbox" id="conn-mode-text" checked> 文本回复</label>
+        <label class="note"><input type="checkbox" id="conn-mode-tool" checked> 工具调用</label>
+        <button class="btn primary" id="conn-run-btn">开始测试</button>
+      </div>
+      <div class="msg" id="conn-msg"></div>
+    </div>
+    <div class="card">
+      <h2>结果 <span class="hint" id="conn-summary"></span></h2>
+      <div class="tablewrap">
+        <table id="conn-table" style="display:none">
+          <thead><tr><th>模型</th><th>模式</th><th>状态</th><th>耗时</th><th>详情</th></tr></thead>
+          <tbody id="conn-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ settings ============ -->
+  <section class="view" id="view-settings">
+    <div class="pagehead">
+      <h1>设置</h1>
+      <div class="desc">服务参数 · 轮询 · 停止</div>
+    </div>
+    <div class="card">
+      <h2>轮询与并发</h2>
+      <div class="rowline" style="margin-bottom:10px">
+        <label class="note"><input type="checkbox" id="poll-toggle"> 启用多账号轮询</label>
+        <label class="note"><input type="radio" name="poll-mode" value="round-robin" checked> 顺序轮换</label>
+        <label class="note"><input type="radio" name="poll-mode" value="least-used"> 优先低消耗</label>
+      </div>
+      <div class="rowline">
+        <label class="note">签到间隔(秒)</label>
+        <input class="kinput" id="set-checkin-interval" value="{{CHECKIN_INTERVAL}}" style="width:90px">
+        <label class="note">自定义上游(可选)</label>
+        <input class="kinput" id="set-base-url" placeholder="留空用默认" style="min-width:260px">
+        <button class="btn primary" id="settings-save">保存设置</button>
+      </div>
+      <div class="msg" id="settings-msg"></div>
+      <hr class="sep">
+      <div class="note">账号安全：每账号并发上限 2，失败回合不会自动重放（防重复扣分）。
+        验证连接请用小 max_tokens；模型表有 TTL 缓存，不会逐请求打上游。</div>
+    </div>
+    <div class="card">
+      <h2>服务</h2>
+      <div class="rowline">
+        <button class="btn danger" id="stop-btn">停止服务</button>
+        <span class="note">停止后需手动运行 start-trae2api.cmd 恢复</span>
+      </div>
+      <div class="msg" id="service-msg"></div>
+    </div>
+  </section>
+
+</div>
+</main>
+
+<div class="toast" id="toast"><b id="toast-title"></b><span id="toast-text"></span></div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const state = { traceId: '', win: null, models: [], allowlist: [], activeAccount: '' };
+
+/* ───── feedback ───── */
+let toastTimer = null;
+function showToast(title, text, ok, timeout) {
+  const toast = $('toast');
+  $('toast-title').textContent = title || '';
+  $('toast-text').textContent = text || '';
+  toast.className = 'toast visible ' + (ok ? 'ok' : 'error');
+  clearTimeout(toastTimer);
+  const delay = timeout === undefined ? (ok ? 3000 : 9000) : timeout;
+  if (delay > 0) toastTimer = setTimeout(() => { toast.className = 'toast'; }, delay);
+}
+function showMsg(id, text, ok, timeout) {
+  const el = $(id);
+  if (!el) return;
+  if (!text) { el.textContent = ''; el.className = 'msg'; return; }
+  el.textContent = text;
+  el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
+  showToast(ok ? '成功' : '操作失败', text, ok, timeout === undefined ? (ok ? 3000 : 9000) : timeout);
+}
+function escapeHtml(value) {
+  return String(value === undefined || value === null ? '' : value)
+    .replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+}
+function setBusy(btn, busy) {
+  if (!btn) return;
+  btn.disabled = !!busy;
+  btn.classList.toggle('loading', !!busy);
+}
+
+/* ───── fetch helpers ───── */
+async function requestJSON(url, init, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 45000);
+  try {
+    const r = await fetch(url, Object.assign({ cache: 'no-store' }, init || {}, { signal: ctrl.signal }));
+    let data = null;
+    try { data = await r.json(); } catch (e) { data = null; }
+    return { ok: r.ok, status: r.status, data: data };
+  } catch (e) {
+    return { ok: false, status: 0, data: { error: String(e) } };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function postJSON(url, payload, timeoutMs) {
+  const result = await requestJSON(url, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {})
+  }, timeoutMs || 45000);
+  let d = result.data;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) d = {};
+  d._http_status = result.status; d._http_ok = result.ok;
+  return d;
+}
+function apiError(data, status) {
+  if (!data) return 'HTTP ' + (status || '?');
+  const body = data.data || data;
+  const code = body && body.code !== undefined && body.code !== null ? String(body.code) : '';
+  return (body && (body.error || body.message)) || ('HTTP ' + (status || '?') + (code ? ' code ' + code : ''));
+}
+
+/* ───── navigation ───── */
+document.querySelectorAll('.navitem[data-view]').forEach((el) => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.navitem[data-view]').forEach((n) => n.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.view').forEach((v) => v.classList.remove('on'));
+    const view = $('view-' + el.getAttribute('data-view'));
+    if (view) view.classList.add('on');
+  });
+});
+function goto(view) {
+  const nav = document.querySelector('.navitem[data-view="' + view + '"]');
+  if (nav) nav.click();
+}
+
+/* ───── auth (PKCE-ish web login) ───── */
+function uuid() {
+  return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
+    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+}
+function randomHex(n) {
+  const bytes = crypto.getRandomValues(new Uint8Array(n / 2));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+function randomDigits(n) {
+  let s = '';
+  const bytes = crypto.getRandomValues(new Uint8Array(n));
+  for (let i = 0; i < n; i++) s += String(bytes[i] % 10);
+  return s;
+}
+function buildAuthUrl() {
+  // Trae forces the callback onto 127.0.0.1, so the local helper forwards it.
+  const cb = 'http://127.0.0.1:{{LISTENER_PORT}}/authorize';
+  const mid = randomHex(32), did = randomDigits(19);
+  const p = new URLSearchParams({
+    login_version: '1', auth_from: 'solo', login_channel: 'native_ide', plugin_version: '2.3.24254',
+    auth_type: 'local', client_id: '{{CLIENT_ID}}', redirect: '0', login_trace_id: state.traceId,
+    auth_callback_url: cb, machine_id: mid, device_id: did, x_device_id: did, x_machine_id: mid,
+    x_device_brand: 'ASUS TUF Gaming A15 FA507RM_FA507RM', x_device_type: 'windows',
+    x_os_version: 'Windows 10 Pro', x_env: '',
+    x_app_version: '3.3.65', x_app_type: 'stable', hide_saas_login: 'true',
+  });
+  return '{{AUTH_URL}}?' + p.toString();
+}
+async function checkLocalListener() {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 1200);
+    const r = await fetch('http://127.0.0.1:{{LISTENER_PORT}}/healthz', { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(timer);
+    return r.ok;
+  } catch (e) { return false; }
+}
+async function startAuth() {
+  const btn = $('auth-btn');
+  try {
+    const ok = await checkLocalListener();
+    if (!ok) {
+      showMsg('auth-msg', '未检测到本机授权助手，请先双击运行 start_auth.bat：', false);
+      $('bat-link').style.display = 'inline-flex';
+      return;
+    }
+    state.traceId = uuid();
+    const w = window.open(buildAuthUrl(), 'trae-relay-oauth', 'width=560,height=760');
+    if (!w) { showMsg('auth-msg', '浏览器已拦截弹窗，请允许后重试', false); return; }
+    state.win = w;
+    setBusy(btn, true);
+    showMsg('auth-msg', '请在弹出的 Trae 授权页完成登录…', true, 8000);
+    const poll = setInterval(() => {
+      if (w.closed) {
+        clearInterval(poll);
+        setBusy(btn, false);
+        loadAccounts();
+      }
+    }, 700);
+  } catch (e) {
+    showMsg('auth-msg', String(e), false);
+    setBusy(btn, false);
+  }
+}
+
+/* ───── accounts ───── */
+const AVATAR_COLORS = ['#4f46e5', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777'];
+function avatarColor(id) {
+  let h = 0;
+  for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+function fmtCredits(c) {
+  if (!c) return '—';
+  if (c.unlimited) return '不限';
+  const rem = c.remaining !== undefined && c.remaining !== null ? c.remaining : c.total_limit;
+  return Number(rem).toFixed(0);
+}
+async function loadAccounts() {
+  const result = await requestJSON('/api/checkin/accounts', { method: 'GET' }, 12000);
+  const grid = $('acct-grid');
+  const d = result.data;
+  if (!result.ok || !d || !d.success) {
+    grid.innerHTML = '<div class="empty">账号列表加载失败：' + escapeHtml(apiError(d, result.status)) + '</div>';
+    return;
+  }
+  const accounts = d.accounts || [];
+  state.activeAccount = d.active || state.activeAccount;
+  $('ov-accounts').textContent = String(accounts.length);
+  $('ov-accounts-sub').textContent = accounts.length
+    ? '当前：' + ((accounts.find((a) => a.id === state.activeAccount) || {}).label || state.activeAccount || '—')
+    : '还没有账号，先授权登录';
+  if (!accounts.length) {
+    grid.innerHTML = '<div class="empty">还没有账号，点右上角「授权登录」添加</div>';
+    return;
+  }
+  grid.innerHTML = accounts.map((a) => {
+    const active = a.id === state.activeAccount;
+    const general = (a.credits && a.credits.account_credits) || a.account_credits || null;
+    const total = (a.credits && a.credits.total_credits) || a.total_credits || null;
+    const checked = a.checked_in || (a.checkin && a.checkin.checked_in);
+    return `
+      <div class="acard${active ? ' active' : ''}" data-account-id="${escapeHtml(a.id)}">
+        <div class="top">
+          <div class="avatar" style="background:${avatarColor(a.id)}">${escapeHtml((a.label || a.user_id || '?').slice(0, 1).toUpperCase())}</div>
+          <div class="who">
+            <b>${escapeHtml(a.label || a.user_id || a.id)}${active ? ' <span class="tag ok">当前</span>' : ''}</b>
+            <span>${escapeHtml(a.user_id || a.id)}</span>
+          </div>
+        </div>
+        <div class="credits">
+          <div class="mini-kv"><div class="k">通用积分</div><div class="v">${fmtCredits(general)}</div></div>
+          <div class="mini-kv"><div class="k">总积分</div><div class="v">${fmtCredits(total)}</div></div>
+          <div class="mini-kv"><div class="k">签到</div><div class="v">${checked ? '<span class="tag ok">已签</span>' : '<span class="tag cool">未签</span>'}</div></div>
+        </div>
+        <div class="acts">
+          <button class="btn${checked ? ' done' : ' primary'}" data-action="checkin" data-id="${escapeHtml(a.id)}">${checked ? '今日已签到' : '签到'}</button>
+          <button class="btn" data-action="switch" data-id="${escapeHtml(a.id)}"${active ? ' disabled' : ''}>切换</button>
+          <button class="btn danger" data-action="remove" data-id="${escapeHtml(a.id)}">删除</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+async function checkinAccount(id) {
+  const btn = document.querySelector('[data-action="checkin"][data-id="' + CSS.escape(id) + '"]');
+  setBusy(btn, true);
+  try {
+    const d = await postJSON('/api/checkin/claim', { account_id: id }, 30000);
+    if (d.success) {
+      showMsg('account-msg', '签到成功' + (d.credits !== undefined ? '，积分 +' + d.credits : ''), true);
+    } else {
+      showMsg('account-msg', d.error || '签到失败', false);
+    }
+  } finally {
+    setBusy(btn, false);
+    loadAccounts();
+  }
+}
+async function checkinAll() {
+  const btn = $('acct-checkin') || $('ov-checkin');
+  setBusy(btn, true);
+  try {
+    const d = await postJSON('/api/checkin/claim-all', {}, 60000);
+    const ok = d && (d.ok !== false && d.success !== false);
+    showMsg('account-msg', ok ? ('签到完成：' + (d.checked || d.message || '见账号卡状态')) : (d.error || '签到失败'), ok);
+  } finally {
+    setBusy(btn, false);
+    loadAccounts();
+  }
+}
+async function refreshCredits() {
+  const btn = $('acct-refresh');
+  setBusy(btn, true);
+  try {
+    const result = await requestJSON('/api/checkin/credits/accounts', { method: 'GET' }, 30000);
+    const d = result.data;
+    if (result.ok && d && d.success !== false) {
+      const accounts = d.accounts || [];
+      let sum = 0, any = false;
+      accounts.forEach((a) => {
+        const c = a.credits && a.credits.account_credits;
+        if (c && !c.unlimited) { sum += Number(c.remaining || 0); any = true; }
+      });
+      $('ov-credits').textContent = any ? sum.toFixed(0) : '—';
+      showMsg('account-msg', '积分已刷新', true);
+    } else {
+      showMsg('account-msg', apiError(d, result.status), false);
+    }
+  } finally {
+    setBusy(btn, false);
+    loadAccounts();
+  }
+}
+async function switchAccount(id) {
+  const btn = document.querySelector('[data-action="switch"][data-id="' + CSS.escape(id) + '"]');
+  setBusy(btn, true);
+  try {
+    const d = await postJSON('/api/accounts/switch', { account_id: id }, 30000);
+    if (!d.success) { showMsg('account-msg', d.error || '切换失败', false); return; }
+    state.activeAccount = d.active || id;
+    showMsg('account-msg', '已切换到 ' + ((d.account && (d.account.label || d.account.user_id)) || id), true);
+  } finally {
+    setBusy(btn, false);
+    loadAccounts();
+  }
+}
+async function removeAccount(id) {
+  if (!confirm('确定删除该账号？凭证将从本机移除。')) return;
+  const d = await postJSON('/api/accounts/remove', { account_id: id });
+  if (d.success) { showMsg('account-msg', '已删除', true); loadAccounts(); }
+  else showMsg('account-msg', d.error || '删除失败', false);
+}
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const id = el.getAttribute('data-id');
+  const action = el.getAttribute('data-action');
+  if (action === 'checkin') checkinAccount(id);
+  else if (action === 'switch') switchAccount(id);
+  else if (action === 'remove') removeAccount(id);
+});
+
+/* ───── allowlist & models ───── */
+async function loadAllowlist() {
+  const result = await requestJSON('/api/allowlist', { method: 'GET' }, 12000);
+  const d = result.data;
+  const chips = $('allow-chips');
+  if (!result.ok || !d) { chips.innerHTML = '<span class="note">白名单加载失败</span>'; return; }
+  const list = d.models || d.allowlist || [];
+  state.allowlist = Array.isArray(list) ? list.map((m) => (typeof m === 'string' ? m : m.id || m.name)).filter(Boolean) : [];
+  renderAllowlist();
+}
+function renderAllowlist() {
+  const chips = $('allow-chips');
+  $('allow-count').textContent = state.allowlist.length ? state.allowlist.length + ' 个模型' : '未启用白名单（全部暴露）';
+  if (!state.allowlist.length) {
+    chips.innerHTML = '<span class="note">白名单为空 = 全部模型可用。添加模型后只有勾选的会暴露给 /v1。</span>';
+    return;
+  }
+  chips.innerHTML = state.allowlist.map((m) =>
+    `<span class="chip">${escapeHtml(m)}<span class="x" data-remove-model="${escapeHtml(m)}">×</span></span>`).join('');
+  chips.querySelectorAll('[data-remove-model]').forEach((el) => {
+    el.addEventListener('click', () => {
+      state.allowlist = state.allowlist.filter((m) => m !== el.getAttribute('data-remove-model'));
+      renderAllowlist();
+    });
+  });
+}
+function fillModelOptions() {
+  const options = state.models.map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.id)}${m.display_name && m.display_name !== m.id ? ' · ' + escapeHtml(m.display_name) : ''}</option>`).join('');
+  const allowSel = $('allow-select');
+  const connSel = $('conn-model');
+  if (allowSel) allowSel.innerHTML = options || '<option>先点「刷新模型列表」</option>';
+  if (connSel) connSel.innerHTML = options || '<option>先点「刷新模型列表」</option>';
+}
+async function refreshModels() {
+  const btn = $('models-refresh') || $('quick-models');
+  setBusy(btn, true);
+  try {
+    const result = await requestJSON('/v1/models?refresh=1', { method: 'GET' }, 30000);
+    const d = result.data;
+    if (!result.ok || !d || !Array.isArray(d.data)) {
+      showMsg('allow-msg', apiError(d, result.status), false);
+      return;
+    }
+    state.models = d.data.map((m) => ({
+      id: m.id,
+      display_name: m.display_name || m.id,
+      context_window: m.context_window || 0,
+      capability: m.capability || '',
+      credit_rate: m.credit_rate,
+      is_new: !!m.is_new,
+      multimodal: !!m.multimodal,
+    }));
+    fillModelOptions();
+    const body = $('models-body');
+    body.innerHTML = state.models.map((m) => `
+      <tr>
+        <td class="mono">${escapeHtml(m.id)}${m.is_new ? ' <span class="tag new">NEW</span>' : ''}</td>
+        <td>${escapeHtml(m.display_name)}</td>
+        <td class="mono">${m.context_window ? (m.context_window / 1000).toFixed(0) + 'K' : '—'}</td>
+        <td>${m.multimodal ? '<span class="tag info">多模态</span> ' : ''}${escapeHtml(m.capability || '—')}</td>
+        <td class="mono">${m.credit_rate !== undefined && m.credit_rate !== null ? escapeHtml(String(m.credit_rate)) : '—'}</td>
+        <td><button class="btn" data-quick-add="${escapeHtml(m.id)}">＋</button></td>
+      </tr>`).join('') || '<tr><td colspan="6" class="empty">无模型</td></tr>';
+    body.querySelectorAll('[data-quick-add]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const id = el.getAttribute('data-quick-add');
+        if (!state.allowlist.includes(id)) { state.allowlist.push(id); renderAllowlist(); }
+        showMsg('allow-msg', id + ' 已加入白名单（记得点保存）', true);
+      });
+    });
+    showMsg('allow-msg', '模型列表已刷新：' + state.models.length + ' 个', true);
+  } finally {
+    setBusy(btn, false);
+  }
+}
+async function saveAllowlist() {
+  const btn = $('allow-save');
+  setBusy(btn, true);
+  try {
+    const d = await postJSON('/api/allowlist', { models: state.allowlist }, 20000);
+    if (d.success === false) { showMsg('allow-msg', d.error || '保存失败', false); return; }
+    showMsg('allow-msg', '白名单已保存', true);
+    loadAllowlist();
+  } finally {
+    setBusy(btn, false);
+  }
+}
+$('allow-add').addEventListener('click', () => {
+  const sel = $('allow-select');
+  const id = sel.value;
+  if (!id || id.startsWith('先点')) { showMsg('allow-msg', '先刷新模型列表', false); return; }
+  if (state.allowlist.includes(id)) { showMsg('allow-msg', id + ' 已在白名单', true); return; }
+  state.allowlist.push(id);
+  renderAllowlist();
+  showMsg('allow-msg', id + ' 已加入（记得保存）', true);
+});
+
+/* ───── usage ───── */
+function usageRows(rows, limit) {
+  const list = (rows || []).slice(0, limit || rows.length);
+  return list.map((r) => `
+    <tr>
+      <td class="mono">${escapeHtml(r.time || r.created_at || r.timestamp || '—')}</td>
+      <td class="mono">${escapeHtml(r.model || '—')}</td>
+      <td>${escapeHtml(r.product || r.product_side || r.client || 'api')}</td>
+      ${limit ? '' : `<td>${r.status ? '<span class="badge ' + (String(r.status).toLowerCase().indexOf('ok') >= 0 || r.status === 200 ? 'ok' : 'bad') + '">' + escapeHtml(String(r.status)) + '</span>' : '<span class="badge ok">200</span>'}</td>
+      <td class="mono">${r.prompt_tokens !== undefined ? escapeHtml(String(r.prompt_tokens)) : '—'}</td>
+      <td class="mono">${r.completion_tokens !== undefined ? escapeHtml(String(r.completion_tokens)) : '—'}</td>`}
+      <td class="mono">${r.credits !== undefined && r.credits !== null ? escapeHtml(String(r.credits)) : '—'}</td>
+      ${limit ? '' : `<td class="mono">${r.ttfb_ms !== undefined ? escapeHtml(String(r.ttfb_ms)) : '—'}</td>`}
+      <td class="mono">${r.elapsed_ms !== undefined ? escapeHtml(String(r.elapsed_ms)) : '—'}</td>
+    </tr>`).join('');
+}
+async function refreshUsage() {
+  const result = await requestJSON('/api/usage/records', { method: 'GET' }, 15000);
+  const d = result.data;
+  const rows = (d && (d.records || d.data)) || (Array.isArray(d) ? d : []);
+  const body = $('usage-body');
+  const ovBody = $('ov-usage-body');
+  if (!result.ok) {
+    const msg = apiError(d, result.status);
+    if (body) body.innerHTML = '<tr><td colspan="9" class="empty">加载失败：' + escapeHtml(msg) + '</td></tr>';
+    if (ovBody) ovBody.innerHTML = '<tr><td colspan="5" class="empty">加载失败</td></tr>';
+    return;
+  }
+  if (!rows.length) {
+    if (body) body.innerHTML = '<tr><td colspan="9" class="empty">暂无记录——发起一次 /v1/chat/completions 后再来看</td></tr>';
+    if (ovBody) ovBody.innerHTML = '<tr><td colspan="5" class="empty">暂无记录</td></tr>';
+    return;
+  }
+  if (body) body.innerHTML = usageRows(rows);
+  if (ovBody) ovBody.innerHTML = usageRows(rows, 5);
+}
+
+/* ───── connectivity test ───── */
+function connModes() {
+  const modes = [];
+  if ($('conn-mode-text').checked) modes.push('text');
+  if ($('conn-mode-tool').checked) modes.push('tool');
+  return modes;
+}
+function connRow(model, mode) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="mono">${escapeHtml(model)}</td>
+    <td>${mode === 'tool' ? '工具调用' : '文本回复'}</td>
+    <td class="conn-status">排队中…</td>
+    <td class="conn-time mono">—</td>
+    <td class="conn-detail">—</td>`;
+  return tr;
+}
+async function runConnTest() {
+  const btn = $('conn-run-btn');
+  const table = $('conn-table');
+  const tbody = $('conn-tbody');
+  const summary = $('conn-summary');
+  const model = $('conn-model').value;
+  const modes = connModes();
+  if (!model || model.startsWith('先点')) { showMsg('conn-msg', '先到「模型白名单」刷新模型列表', false); return; }
+  if (!modes.length) { showMsg('conn-msg', '请至少勾选一种测试内容', false); return; }
+  const timeout = parseInt($('conn-timeout').value, 10) || 120;
+  setBusy(btn, true);
+  table.style.display = 'table';
+  tbody.innerHTML = '';
+  showMsg('conn-msg', '');
+  const jobs = modes.map((mode) => {
+    const row = connRow(model, mode);
+    tbody.appendChild(row);
+    return { mode: mode, row: row };
+  });
+  let passed = 0, done = 0;
+  summary.textContent = '0/' + jobs.length + ' 完成';
+  for (const job of jobs) {
+    const statusCell = job.row.querySelector('.conn-status');
+    const timeCell = job.row.querySelector('.conn-time');
+    const detailCell = job.row.querySelector('.conn-detail');
+    statusCell.textContent = '测试中…';
+    statusCell.style.color = 'var(--dim2)';
+    try {
+      const d = await postJSON('/api/model-test', { model: model, mode: job.mode, timeout: timeout }, (timeout + 20) * 1000);
+      timeCell.textContent = d.elapsed_ms !== undefined ? d.elapsed_ms + ' ms' : '—';
+      const ok = d.success !== false && (d._http_ok || d.ok);
+      if (ok) {
+        passed++;
+        statusCell.innerHTML = '<span class="badge ok">通过</span>';
+        detailCell.textContent = d.detail || d.preview || d.message || (job.mode === 'tool' ? '工具调用返回正常' : '文本回复正常');
+      } else {
+        statusCell.innerHTML = '<span class="badge bad">失败</span>';
+        statusCell.style.color = '';
+        detailCell.textContent = d.error || apiError(d, d._http_status) || '未知错误';
+      }
+    } catch (e) {
+      statusCell.innerHTML = '<span class="badge bad">失败</span>';
+      detailCell.textContent = String(e);
+    }
+    statusCell.style.color = '';
+    done++;
+    summary.textContent = done + '/' + jobs.length + ' 完成 · 通过 ' + passed;
+  }
+  setBusy(btn, false);
+  showMsg('conn-msg', '测试结束：' + passed + '/' + jobs.length + ' 通过', passed === jobs.length);
+}
+
+/* ───── settings & service ───── */
+async function loadSettings() {
+  const result = await requestJSON('/api/polling', { method: 'GET' }, 10000);
+  const d = result.data;
+  if (result.ok && d) {
+    $('poll-toggle').checked = !!(d.enabled || (d.polling && d.polling.enabled));
+    const mode = d.mode || (d.polling && d.polling.mode) || 'round-robin';
+    const radio = document.querySelector('input[name=poll-mode][value="' + mode + '"]');
+    if (radio) radio.checked = true;
+  }
+}
+async function saveSettings() {
+  const btn = $('settings-save');
+  setBusy(btn, true);
+  try {
+    const mode = (document.querySelector('input[name=poll-mode]:checked') || {}).value || 'round-robin';
+    const d = await postJSON('/api/settings', {
+      checkin_interval: parseInt($('set-checkin-interval').value, 10) || undefined,
+      base_url: $('set-base-url').value.trim() || undefined,
+    }, 20000);
+    const p = await postJSON('/api/polling', { enabled: $('poll-toggle').checked, mode: mode }, 20000);
+    const ok = d.success !== false && p.success !== false;
+    showMsg('settings-msg', ok ? '设置已保存' : ((d.error || p.error) || '保存失败'), ok);
+  } finally {
+    setBusy(btn, false);
+  }
+}
+async function stopService() {
+  if (!confirm('确定要停止 Trae2API 服务吗？\n\n停止后需手动运行 start-trae2api.cmd 重新启动。')) return;
+  const btn = $('stop-btn');
+  setBusy(btn, true);
+  try {
+    const d = await postJSON('/api/stop', {}, 15000);
+    if (d && (d.ok || d.success)) {
+      showMsg('service-msg', '正在停止服务…请用 start-trae2api.cmd 手动恢复', true, 8000);
+      $('side-dot').classList.add('err');
+      $('side-status').textContent = '已停止';
+    } else {
+      showMsg('service-msg', (d && d.error) || '停止失败', false);
+    }
+  } catch (e) {
+    showMsg('service-msg', String(e), false);
+  } finally {
+    setBusy(btn, false);
+  }
+}
+
+/* ───── status ───── */
+async function loadStatus() {
+  const result = await requestJSON('/healthz', { method: 'GET' }, 8000);
+  const ok = result.ok;
+  $('ov-health').textContent = ok ? '运行中' : '不可达';
+  $('side-status').textContent = ok ? '服务运行中' : '服务不可达';
+  $('side-dot').classList.toggle('err', !ok);
+  const status = await requestJSON('/v1/status', { method: 'GET' }, 8000);
+  if (status.ok && status.data) {
+    const d = status.data;
+    $('ov-mode').textContent = d.upstream_mode || '{{UPSTREAM_MODE}}';
+    $('foot-mode').textContent = d.upstream_mode || '{{UPSTREAM_MODE}}';
+  }
+}
+
+/* ───── wire up ───── */
+async function addManualAccount() {
+  const token = $('manual-token').value.trim();
+  if (!token) { showMsg('manual-msg', 'token 必填', false); return; }
+  const btn = $('manual-add');
+  setBusy(btn, true);
+  try {
+    const d = await postJSON('/api/web-auth', {
+      token: token,
+      refresh_token: $('manual-refresh').value.trim(),
+      user_id: $('manual-user-id').value.trim(),
+      host: $('manual-host').value.trim(),
+      label: $('manual-label').value.trim(),
+    }, 20000);
+    if (d.success === false) { showMsg('manual-msg', d.error || '添加失败', false); return; }
+    showMsg('manual-msg', '账号已添加', true);
+    ['manual-token', 'manual-refresh', 'manual-user-id', 'manual-host', 'manual-label'].forEach((id) => { $(id).value = ''; });
+    loadAccounts();
+  } finally {
+    setBusy(btn, false);
+  }
+}
+$('manual-add').addEventListener('click', addManualAccount);
+$('ov-refresh').addEventListener('click', () => { loadStatus(); loadAccounts(); refreshCredits(); });
+$('ov-checkin').addEventListener('click', checkinAll);
+$('acct-checkin').addEventListener('click', checkinAll);
+$('acct-refresh').addEventListener('click', refreshCredits);
+$('acct-auth').addEventListener('click', startAuth);
+$('auth-btn').addEventListener('click', startAuth);
+$('models-refresh').addEventListener('click', refreshModels);
+$('allow-save').addEventListener('click', saveAllowlist);
+$('usage-refresh').addEventListener('click', refreshUsage);
+$('conn-run-btn').addEventListener('click', runConnTest);
+$('settings-save').addEventListener('click', saveSettings);
+$('stop-btn').addEventListener('click', stopService);
+$('quick-auth').addEventListener('click', () => { goto('accounts'); startAuth(); });
+$('quick-conn').addEventListener('click', () => { goto('conn'); runConnTest(); });
+$('quick-models').addEventListener('click', () => { goto('models'); refreshModels(); });
+$('quick-usage').addEventListener('click', () => { goto('usage'); refreshUsage(); });
+
+(async function boot() {
+  loadStatus();
+  loadAccounts();
+  loadAllowlist();
+  loadSettings();
+  refreshUsage();
+  refreshModels();
+})();
+</script>
+</body>
+</html>

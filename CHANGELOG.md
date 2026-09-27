@@ -1,6 +1,44 @@
 # CHANGELOG — trae2api-cn
 
+## v23 (2026-09-27)：SOLO 原生工具通道上线（llm_utils_chat），文本提示桥退役
+
+- **换通道（核心）**：新增 `src/trae_solo.py`——SOLO `POST /api/agent/v3/llm_utils_chat`
+  （`function=solo_work_lite`）成为默认上游（`UPSTREAM_MODE=solo`）。请求体**原生携带
+  OpenAI `tools`/`tool_choice`**（parameters 转上游 JSON 字符串、assistant 工具历史转
+  `function_call` 形状），SSE `event:output.tool_calls` **结构化返回工具调用**（id/name
+  首帧、arguments 按 index 增量），经 `ToolCallAccumulator` 聚合成标准 OpenAI 流式
+  `tool_calls` delta。文本提示桥（`<opencode_tool_call>`）不再是工具主路径。
+- **2026-09-27 实测背书**：`get_detail_param` 返回 41 个现役 config（glm-5.3、
+  DeepSeek-V4.1/4-Pro/Flash、Seed-2.1-Pro-0915、kimi-k3、qwen3.8-max、minimax-m3、
+  step-5-preview…，200K~256K 窗口，含官方 is_new 与积分费率）；`tool_choice=auto` 下
+  自然问法（不点名工具）2/2 主动调用；15 工具真实 schema（嵌套数组/枚举/正则参数）
+  并行调用与多轮 tool-result 续轮全通过；本地 relay 端到端（非流式+流式、文本+工具+
+  续轮+usage 记账）全部验收。
+- **v15 SOLO 失败之谜解开**：当年 `param is invalid` 是 **`X-Ide-Version` 版本门**——
+  0.1.43 被拒，`0.1.52`（code 20260811）放行全部现役模型。header 全套（Cloud-IDE-JWT
+  + X-Cloudide-Token/X-Ide-Token/X-Uid/X-App-Id/设备字段）已按 tra e2api-web/trae2codex
+  runbook 实测口径固化在 `solo_headers`。
+- **防封（账号安全）**：每账号并发帽（默认 2，`TRAE_SOLO_MAX_PARALLEL`）；失败回合
+  **绝不自动重放**（防重复扣分）；错误按业务码分类（1001 auth / 4001 参数 / 4008 配额 /
+  4011 限流）；请求头版本三元组与设备字段恒定不逐请求变化；模型目录 TTL 缓存
+  （`TRAE_SOLO_MODELS_TTL` 默认 600s）不逐请求打上游；验证请求压小 max_tokens。
+- **前端重做**：控制台改为独立模板 `src/web/admin.html`（JS 全量渲染 + JSON API），
+  灭掉 f-string 内嵌 JS 的转义炸块病根（v5/v22 两次事故的同一类根因）。workbuddy 设计
+  体系：侧栏导航 + 卡片网格 + 状态标签 + 按钮 loading 态 + toast 反馈。功能全保留并新增
+  手动添加凭证表单；服务端仅做 6 个占位符替换。
+- **修复**：流式响应生命周期（`client.aclose()`/并发帽不得在返回 StreamingResponse 时
+  释放，改挂 generator finally）；流式 usage 记账（`_track_usage_from_chunk` 补接线，
+  消费记录 tokens 从恒 0 变精确）；模型白名单对齐 SOLO 现役 20 模型（清掉 remote 时代
+  的 claude-* 死条目）。
+- **已知问题**：tests 会把 fixture 写进真实 `.env`/`data/accounts.json`（uid-1/oauth-token），
+  跑完 pytest 后启动服务前需清理，否则服务以假账号应答 401（既有缺陷，本轮未修）；
+  uvicorn 端口被占时启动静默失败（10048），换端口/杀旧进程后看日志确认 `Uvicorn running`。
+- **积分体系现状**：Work 专属积分已全部升级为通用积分（TraeCode/TraeWork 通吃），
+  SOLO 通道消耗通用积分；`token_usage` 报的是本次请求自身的 prompt/completion。
+
 ## 实验结论记录 (2026-09-07)：提示词桥实战不可用（tool_choice=auto 下模型遵循率≈0）
+> ⚠️ 本结论仅适用于 **remote 文本提示桥**（query 纯文本扁平化通道）。2026-09-27 起默认
+> SOLO 原生工具通道（见 v23），auto 下工具调用正常，此结论不再适用于默认路径。
 
 - **触发**：丞相在 DSH 用 trae provider 真实对话后指出「模型不会听话的输出工具格式」。会话日志取证确认。
 - **取证**（DSH 会话 `975b5631-86ea-4d66-b67a-a1822c71b2d4`，provider=trae）：5 次真实轮次每次都带 tools=151（DSH 不发 tool_choice，即 auto）；relay 日志 5 次桥接全部激活（req-f962e688 / a568bd43 / d16591e72 / 5f7f19f4 / 1e43edd3），结果 **全部 `tool_chunks=0`**——模型直接文字回答，一次都没输出 `<opencode_tool_call>` 协议块。

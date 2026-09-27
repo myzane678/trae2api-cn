@@ -12,9 +12,11 @@
 | 登录 | 控制台授权按钮（或 `start-trae2api-login.cmd` 先行）；token 自动续期 |
 | 白名单 | `TRAE_MODEL_ALLOWLIST`（.env）+ 控制台勾选管理（data/model-allowlist.json 优先），现 14 个 |
 | 积分 | 总 4650（通用 2650 + Work 专属 2000），每日签到 |
-| 工具调用 | ⚠️ Remote 文本提示桥（默认开启）：调用方 tools 注入提示词，模型输出文本 tool call，relay 转为 OpenAI `tool_calls`。**仅在调用方显式 `tool_choice=required` 时可靠；自然对话（auto）下 Trae Agent 模型遵循率≈0**（2026-09-07 实测 5/5 无工具输出），对 DSH 等不发 tool_choice 的调用方实际为纯文本 |
-| 上游模式 | `UPSTREAM_MODE=remote`；`TRAE_REMOTE_PROMPT_TOOLS_ENABLED=true` 默认开启（v18 验证后）；旧 SOLO Lite 代码已删除；raw 仍是研究路径 |
-| 已知问题 | auto 模型不可用；remote 池对免费账号有模型限制（间歇）；提示词桥在 tool_choice=auto 下不可用（上游 Agent 系统提示词压制，见 CHANGELOG 实验结论记录）；raw 恢复前 TRAE 渠道仅作纯文本模型使用 |
+| 工具调用 | ✅ SOLO 原生通道（v23）：请求体原生 `tools`/`tool_choice`，SSE `event:output.tool_calls` 结构化返回，标准 OpenAI 流式 `tool_calls` delta。`tool_choice=auto` 自然问法实测主动调工具（2/2），多轮 tool-result 续轮正常。remote 文本提示桥仅作 `UPSTREAM_MODE=remote` 显式回退 |
+| 上游模式 | `UPSTREAM_MODE=solo`（默认）：`llm_utils_chat` + `function=solo_work_lite`，`X-Ide-Version: 0.1.52` 解锁现役 41 模型；remote/raw/ide/cli 等保留为诊断回退 |
+| 模型 | 现役 20 个白名单主力（glm-5.3、DeepSeek-V4.1/4-Pro/Flash、Seed-2.1-Pro-0915 256K、kimi-k3、qwen3.8-max、minimax-m3、step-5-preview…），控制台可勾选；费率/上下文窗口见「模型白名单」页 |
+| 积分 | 全部为通用积分（Work 专属已升级合并，TraeCode/TraeWork 通吃），SOLO 通道消耗通用积分 |
+| 已知问题 | tests 会污染 `.env`/`data/accounts.json`（跑完 pytest 要清 fixture 再启动）；auto 模型 id 不可用（用显式模型）；Work 通道（create_agent_task）加密字段锁在本地进程不可反代 |
 
 **仅供学习使用。请勿用于商业用途。**
 
