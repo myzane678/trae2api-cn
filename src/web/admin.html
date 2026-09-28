@@ -212,7 +212,7 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
     <button class="navitem" data-view="settings">设置</button>
   </nav>
   <div class="sfoot">
-    <div class="kv"><b>上游模式</b> <span id="foot-mode">{{UPSTREAM_MODE}}</span></div>
+    <button class="navitem" id="side-restart">重启服务</button>
     <button class="navitem red" id="side-stop">停止服务</button>
   </div>
 </aside>
@@ -633,6 +633,14 @@ async function loadAccounts() {
   const gen = active && ((active.credits && active.credits.account_credits) || active.account_credits);
   $('ov-credits').textContent = fmtCreditsRaw(gen);
   applyPollingGate();
+  // "check in all" only makes sense while some account still needs it
+  const allDone = accounts.length > 0 && accounts.every((a) => a.checked_in || (a.checkin && a.checkin.checked_in));
+  ['acct-checkin', 'ov-checkin'].forEach((bid) => {
+    const b = $(bid);
+    if (!b) return;
+    if (allDone) { b.classList.add('done'); b.disabled = true; b.textContent = '今日已全部签到'; }
+    else { b.classList.remove('done'); b.disabled = false; b.textContent = '全部签到'; }
+  });
   if (!accounts.length) {
     grid.innerHTML = '<div class="empty">还没有账号，点上方「使用 Trae 网页授权登录」添加</div>';
     return;
@@ -982,6 +990,39 @@ async function runConnTest() {
   showMsg('conn-msg', '测试结束：' + passed + '/' + jobs.length + ' 通过', passed === jobs.length);
 }
 
+async function restartService() {
+  if (!confirm('确定要重启 Trae2API 服务吗？\n\n进行中的请求会中断，新进程几秒后自动接管。')) return;
+  const btn = $('side-restart');
+  setBusy(btn, true);
+  try {
+    const d = await postJSON('/api/restart', {}, 15000);
+    if (d && (d.ok || d.success)) {
+      $('side-status').textContent = '重启中…';
+      showToast('服务', '正在重启，几秒后自动恢复', true, 6000);
+      const poll = setInterval(async () => {
+        try {
+          const r = await fetch('/healthz', { cache: 'no-store' });
+          if (r.ok) {
+            clearInterval(poll);
+            setBusy(btn, false);
+            $('side-status').textContent = '服务运行中';
+            showToast('服务', '重启完成', true);
+            loadAccounts();
+            loadSummary();
+          }
+        } catch (e) { /* still down, keep polling */ }
+      }, 1500);
+      setTimeout(() => { clearInterval(poll); setBusy(btn, false); }, 30000);
+    } else {
+      setBusy(btn, false);
+      showToast('服务', (d && d.error) || '重启失败', false);
+    }
+  } catch (e) {
+    setBusy(btn, false);
+    showToast('服务', String(e), false);
+  }
+}
+
 /* ───── settings & service ───── */
 function applyPollingGate() {
   const single = state.accounts.length < 2;
@@ -1092,6 +1133,7 @@ async function addManualAccount() {
   }
 }
 $('manual-add').addEventListener('click', addManualAccount);
+$('side-restart').addEventListener('click', restartService);
 $('ov-refresh').addEventListener('click', () => { loadStatus(); loadAccounts(); loadSummary(); });
 $('acct-refresh').addEventListener('click', refreshCredits);
 $('acct-checkin').addEventListener('click', checkinAll);

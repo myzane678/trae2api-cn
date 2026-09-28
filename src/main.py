@@ -30,6 +30,8 @@ import re
 import threading
 import time
 import secrets
+import subprocess
+import sys
 import uuid as uuid_mod
 import zlib
 from collections import OrderedDict
@@ -48,7 +50,7 @@ import dotenv
 dotenv.load_dotenv()
 
 import httpx
-from fastapi import FastAPI, Query, Request
+from fastapi import BackgroundTasks, FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.responses import FileResponse
 
@@ -330,6 +332,7 @@ PUBLIC_PATHS = {
     "/api/allowlist",
     "/api/model-test",
     "/api/stop",
+    "/api/restart",
 }
 PUBLIC_PATH_PREFIXES = ("/api/checkin", "/api/accounts", "/web/assets/")
 WEB_LOGIN_SCRIPT = Path(__file__).resolve().parent.parent / "web_login.py"
@@ -5655,6 +5658,36 @@ async def api_checkin_claim():
 async def api_logout():
     auth.logout_active()
     return JSONResponse({"success": True})
+
+
+@app.post("/api/restart")
+async def api_restart(background: BackgroundTasks):
+    """Respawn the relay: a detached helper (src/respawn.py) waits for this
+    process to free the port, then starts a fresh one; this process exits
+    once the response has been delivered."""
+    base = Path(__file__).resolve().parent.parent
+    py = str(base / ".venv" / "Scripts" / "python.exe")
+    helper = str(Path(__file__).resolve().parent / "respawn.py")
+    if not Path(py).is_file():
+        py = sys.executable
+    flags = 0
+    if hasattr(subprocess, "DETACHED_PROCESS"):
+        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        # Break away from any job object (e.g. a parent terminal) so the
+        # fresh relay survives when the caller's process tree is torn down.
+        if hasattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB"):
+            flags |= subprocess.CREATE_BREAKAWAY_FROM_JOB
+    try:
+        subprocess.Popen([py, helper], cwd=str(base), creationflags=flags, close_fds=True)
+    except OSError:
+        subprocess.Popen([py, helper], cwd=str(base), close_fds=True)
+
+    def _delayed_exit():
+        time.sleep(1.2)
+        os._exit(0)
+
+    background.add_task(_delayed_exit)
+    return JSONResponse({"ok": True, "msg": "restarting (a fresh process will take over)"})
 
 
 @app.post("/api/stop")
