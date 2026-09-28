@@ -49,7 +49,7 @@ body{min-height:100vh;background:var(--bg)}
 .navitem.red{color:var(--err)}
 .navitem.red:hover{background:#fef2f2;color:#b91c1c}
 .sfoot{padding:10px 12px 14px;border-top:1px solid var(--soft2);display:flex;flex-direction:column;gap:8px}
-.sfoot .kv{font-size:11px;color:var(--dim2);font-family:var(--mono);word-break:break-all;line-height:1.5}
+.sfoot .kv{font-size:11px;color:var(--dim2);font-family:var(--mono);line-height:1.5}
 .sfoot .kv b{color:var(--dim);font-weight:600}
 
 /* ───── main ───── */
@@ -79,14 +79,14 @@ body{min-height:100vh;background:var(--bg)}
 .btn.loading::after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;
   border:2px solid #cbd2dd;border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-select.btn,input.kinput{font-family:inherit}
-input.kinput,select.kinput,textarea.kinput{background:var(--card);border:1px solid var(--line2);color:var(--txt);
+input.kinput,select.kinput{background:var(--card);border:1px solid var(--line2);color:var(--txt);
   border-radius:8px;padding:7px 11px;font-size:13px;font-family:var(--mono)}
-input.kinput:focus,select.kinput:focus,textarea.kinput:focus{outline:none;border-color:var(--acc);
+input.kinput:focus,select.kinput:focus{outline:none;border-color:var(--acc);
   box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+input.kinput[disabled]{background:var(--soft2);color:var(--dim2)}
 
 /* ───── stat cards ───── */
-.grid4{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px;margin-bottom:16px}
+.grid4{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:13px;margin-bottom:16px}
 .ucard{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--line);
   border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow);transition:all .16s ease}
 .ucard:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
@@ -97,7 +97,7 @@ input.kinput:focus,select.kinput:focus,textarea.kinput:focus{outline:none;border
 .ucard .ic.purple{background:#f5f3ff;color:#7c3aed}
 .ucard .body{min-width:0}
 .ucard .k{color:var(--dim);font-size:12px;font-weight:500}
-.ucard .v{font-size:23px;font-weight:700;margin-top:1px;font-family:var(--mono);
+.ucard .v{font-size:22px;font-weight:700;margin-top:1px;font-family:var(--mono);
   font-variant-numeric:tabular-nums;line-height:1.3;letter-spacing:-.4px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 .ucard .s{color:var(--dim2);font-size:11px;font-family:var(--mono);margin-top:1px}
@@ -109,6 +109,7 @@ input.kinput:focus,select.kinput:focus,textarea.kinput:focus{outline:none;border
   text-transform:uppercase;letter-spacing:.6px}
 .card h2 .hint{margin-left:auto;color:var(--dim2);font-size:11px;font-weight:400;letter-spacing:0;text-transform:none}
 .rowline{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.explain{color:var(--dim2);font-size:11.5px;line-height:1.6;margin-top:4px}
 
 /* ───── tags & badges ───── */
 .tag{display:inline-block;padding:1.5px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
@@ -147,18 +148,32 @@ input.kinput:focus,select.kinput:focus,textarea.kinput:focus{outline:none;border
 table{width:100%;border-collapse:collapse;font-size:12.5px}
 thead th{position:sticky;top:0;background:var(--soft);color:var(--dim);font-weight:600;font-size:11px;
   letter-spacing:.5px;text-transform:uppercase;padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);z-index:1}
-tbody td{padding:9px 12px;border-bottom:1px solid var(--soft2);vertical-align:middle}
+tbody td{padding:9px 12px;border-bottom:1px solid var(--soft2);vertical-align:middle;white-space:nowrap}
 tbody tr:hover{background:#fafbff}
 tbody tr:last-child td{border-bottom:0}
 td.mono,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .empty{padding:34px 12px;text-align:center;color:var(--dim2);font-size:13px}
 
-/* ───── model chips ───── */
+/* ───── chips / key box ───── */
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{display:inline-flex;align-items:center;gap:7px;background:var(--soft);border:1px solid var(--line2);
   border-radius:8px;padding:5px 11px;font-family:var(--mono);font-size:12px}
 .chip .x{cursor:pointer;color:var(--dim2);font-weight:700;padding:0 2px}
 .chip .x:hover{color:var(--err)}
+.keybox{display:flex;align-items:center;gap:10px;background:var(--soft);border:1px solid var(--line);
+  border-radius:9px;padding:10px 14px;flex-wrap:wrap}
+.keybox .lbl{color:var(--dim);font-size:12px;font-weight:600;min-width:78px}
+.keybox code{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:5px 12px;
+  font-family:var(--mono);font-size:12.5px;word-break:break-all}
+
+/* ───── trend chart ───── */
+.trend{display:flex;align-items:flex-end;gap:10px;height:150px;padding:8px 4px 0}
+.trend .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.trend .bar{width:70%;max-width:46px;background:linear-gradient(180deg,#818cf8,#4f46e5);
+  border-radius:6px 6px 2px 2px;min-height:3px;transition:height .3s ease}
+.trend .bar.today{background:linear-gradient(180deg,#34d399,#059669)}
+.trend .num{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.trend .day{font-family:var(--mono);font-size:10.5px;color:var(--dim2)}
 
 /* ───── toast ───── */
 .toast{position:fixed;top:18px;right:18px;z-index:80;min-width:250px;max-width:380px;
@@ -172,16 +187,10 @@ td.mono,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .msg{font-size:12px;min-height:18px;margin-top:6px}
 .msg-ok{color:var(--ok)}
 .msg-err{color:var(--err)}
-
-/* ───── misc ───── */
 .note{color:var(--dim2);font-size:12px}
 .note code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:var(--mono);font-size:11.5px}
 hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
 .conn-detail{max-width:380px;word-break:break-all;font-family:var(--mono);font-size:11px;color:var(--dim)}
-@media (max-width:960px){
-  .main{margin-left:0}
-  .wrap{padding:0 14px 40px}
-}
 </style>
 </head>
 <body>
@@ -204,7 +213,7 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
   </nav>
   <div class="sfoot">
     <div class="kv"><b>上游模式</b> <span id="foot-mode">{{UPSTREAM_MODE}}</span></div>
-    <div class="kv"><b>API Key</b> <span id="foot-key">{{API_KEY}}</span></div>
+    <button class="navitem red" id="side-stop">停止服务</button>
   </div>
 </aside>
 
@@ -216,43 +225,42 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
     <div class="pagehead">
       <h1>概览</h1>
       <div class="desc">Trae CN SOLO 通道 · OpenAI 兼容</div>
-      <div class="acts">
-        <button class="btn" id="ov-refresh">刷新状态</button>
-        <button class="btn primary" id="ov-checkin">全部签到</button>
-      </div>
+      <div class="acts"><button class="btn" id="ov-refresh">刷新数据</button></div>
     </div>
     <div class="grid4">
-      <div class="ucard"><div class="ic green">✓</div><div class="body">
-        <div class="k">服务状态</div><div class="v" id="ov-health">—</div>
-        <div class="s" id="ov-health-sub">127.0.0.1:{{LISTENER_PORT}}</div></div></div>
-      <div class="ucard"><div class="ic">⇄</div><div class="body">
-        <div class="k">上游通道</div><div class="v" id="ov-mode" style="font-size:16px">—</div>
-        <div class="s">llm_utils_chat · 原生工具调用</div></div></div>
       <div class="ucard"><div class="ic purple">✦</div><div class="body">
         <div class="k">可用积分</div><div class="v" id="ov-credits">—</div>
-        <div class="s" id="ov-credits-sub">全部为通用积分</div></div></div>
+        <div class="s">全部为通用积分</div></div></div>
+      <div class="ucard"><div class="ic">Σ</div><div class="body">
+        <div class="k">总 Token</div><div class="v" id="ov-tokens">—</div>
+        <div class="s">本机全部请求累计</div></div></div>
+      <div class="ucard"><div class="ic green">◷</div><div class="body">
+        <div class="k">今日 Token</div><div class="v" id="ov-today-tokens">—</div>
+        <div class="s">北京时间 0 点起</div></div></div>
+      <div class="ucard"><div class="ic amber">✦</div><div class="body">
+        <div class="k">今日消耗积分</div><div class="v" id="ov-today-credits">—</div>
+        <div class="s" id="ov-today-credits-sub">按模型费率估算</div></div></div>
       <div class="ucard"><div class="ic amber">◉</div><div class="body">
         <div class="k">账号</div><div class="v" id="ov-accounts">—</div>
-        <div class="s" id="ov-accounts-sub">点击「账号」管理</div></div></div>
+        <div class="s" id="ov-accounts-sub">—</div></div></div>
     </div>
     <div class="card">
-      <h2>快捷操作</h2>
-      <div class="rowline">
-        <button class="btn primary" id="quick-auth">授权登录新账号</button>
-        <button class="btn" id="quick-conn">跑一次连接测试</button>
-        <button class="btn" id="quick-models">刷新模型列表</button>
-        <button class="btn" id="quick-usage">查看消费记录</button>
-      </div>
-      <div class="msg" id="overview-msg"></div>
+      <h2>7 日消耗趋势 <span class="hint">每天 Token 用量（北京时间）</span></h2>
+      <div class="trend" id="trend"><div class="empty" style="width:100%">加载中…</div></div>
     </div>
     <div class="card">
-      <h2>最近消费 <span class="hint">最新 5 条</span></h2>
-      <div class="tablewrap" style="max-height:280px">
-        <table>
-          <thead><tr><th>时间</th><th>模型</th><th>产品端</th><th>积分</th><th>耗时</th></tr></thead>
-          <tbody id="ov-usage-body"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
-        </table>
+      <h2>接入信息</h2>
+      <div class="keybox" style="margin-bottom:9px">
+        <span class="lbl">接口地址</span>
+        <code id="acc-url">http://127.0.0.1:8092/v1</code>
+        <button class="btn" data-copy="http://127.0.0.1:8092/v1">复制</button>
       </div>
+      <div class="keybox">
+        <span class="lbl">API Key</span>
+        <code id="acc-key">{{API_KEY_MASKED}}</code>
+        <button class="btn" id="acc-key-copy">复制</button>
+      </div>
+      <div class="explain">客户端把 Base URL 设为上面的接口地址、API Key 填入即可；Key 在本机 .env 的 RELAY_API_KEYS 配置，界面上只显示掩码。</div>
     </div>
   </section>
 
@@ -260,39 +268,46 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
   <section class="view" id="view-accounts">
     <div class="pagehead">
       <h1>账号</h1>
-      <div class="desc">cookie 仅本地使用 · round-robin 可轮换</div>
+      <div class="desc">凭据仅存本机 data/accounts.json</div>
       <div class="acts">
-        <button class="btn primary" id="acct-auth">授权登录</button>
         <button class="btn" id="acct-refresh">刷新积分</button>
         <button class="btn" id="acct-checkin">全部签到</button>
       </div>
     </div>
     <div class="card">
-      <h2>网页授权登录</h2>
+      <h2>授权登录</h2>
       <div class="rowline">
         <button class="btn primary" id="auth-btn">使用 Trae 网页授权登录</button>
         <a class="btn" id="bat-link" style="display:none" href="/web/login/download?as=bat">下载一键启动 start_auth.bat</a>
       </div>
       <div class="msg" id="auth-msg"></div>
-      <div class="note" style="margin-top:8px">授权回调固定为 <code>http://127.0.0.1:{{LISTENER_PORT}}/authorize</code>，
-        需本机助手在线（双击 start_auth.bat）。凭据只写入本机 data/accounts.json。</div>
+      <div class="explain">授权回调固定为 <code>http://127.0.0.1:{{LISTENER_PORT}}/authorize</code>，需本机助手在线（双击 start_auth.bat）。</div>
     </div>
     <div class="card">
       <h2>手动添加凭证 <span class="hint">已有 token 时直接粘贴</span></h2>
       <div class="rowline" style="margin-bottom:9px">
-        <input class="kinput" id="manual-token" placeholder="token (必填)" style="min-width:320px">
-        <input class="kinput" id="manual-refresh" placeholder="refresh_token (可选)" style="min-width:220px">
-        <input class="kinput" id="manual-user-id" placeholder="user_id (可选)" style="width:170px">
+        <input class="kinput" id="manual-token" placeholder="token（必填）" style="min-width:320px">
+        <input class="kinput" id="manual-refresh" placeholder="refresh_token（可选）" style="min-width:200px">
+        <input class="kinput" id="manual-user-id" placeholder="user_id（可选）" style="width:160px">
       </div>
       <div class="rowline">
-        <input class="kinput" id="manual-host" placeholder="host (可选，默认官方)" style="min-width:260px">
-        <input class="kinput" id="manual-label" placeholder="标签 (可选)" style="width:150px">
+        <input class="kinput" id="manual-host" placeholder="host（可选，默认官方）" style="min-width:240px">
+        <input class="kinput" id="manual-label" placeholder="标签（可选）" style="width:140px">
         <button class="btn primary" id="manual-add">添加账号</button>
       </div>
       <div class="msg" id="manual-msg"></div>
     </div>
     <div class="acctgrid" id="acct-grid"><div class="empty">加载中…</div></div>
     <div class="msg" id="account-msg"></div>
+    <div class="card">
+      <h2>签到记录 <span class="hint">最近 20 次（北京时间）</span></h2>
+      <div class="tablewrap" style="max-height:300px">
+        <table>
+          <thead><tr><th>时间</th><th>账号</th><th>积分</th></tr></thead>
+          <tbody id="checkin-history-body"><tr><td colspan="3" class="empty">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 
   <!-- ============ models ============ -->
@@ -300,9 +315,7 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
     <div class="pagehead">
       <h1>模型白名单</h1>
       <div class="desc">只有勾选的模型会暴露给 /v1</div>
-      <div class="acts">
-        <button class="btn" id="models-refresh">刷新模型列表</button>
-      </div>
+      <div class="acts"><button class="btn" id="models-refresh">刷新模型列表</button></div>
     </div>
     <div class="card">
       <h2>白名单 <span class="hint" id="allow-count"></span></h2>
@@ -330,16 +343,14 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
   <section class="view" id="view-usage">
     <div class="pagehead">
       <h1>消费记录</h1>
-      <div class="desc">按请求计 · 含首字耗时</div>
-      <div class="acts">
-        <button class="btn primary" id="usage-refresh">刷新</button>
-      </div>
+      <div class="desc">按请求计 · 北京时间 · 积分带 ≈ 为估算值</div>
+      <div class="acts"><button class="btn primary" id="usage-refresh">刷新</button></div>
     </div>
     <div class="card">
       <h2>明细</h2>
       <div class="tablewrap">
         <table>
-          <thead><tr><th>时间</th><th>模型</th><th>产品端</th><th>状态</th><th>输入</th><th>输出</th><th>积分</th><th>首字</th><th>耗时</th></tr></thead>
+          <thead><tr><th>时间</th><th>模型</th><th>端点</th><th>状态</th><th>输入</th><th>输出</th><th>积分</th><th>首字</th><th>总耗时</th></tr></thead>
           <tbody id="usage-body"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
         </table>
       </div>
@@ -383,34 +394,33 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
   <section class="view" id="view-settings">
     <div class="pagehead">
       <h1>设置</h1>
-      <div class="desc">服务参数 · 轮询 · 停止</div>
+      <div class="desc">轮询 · 签到 · 上游</div>
     </div>
     <div class="card">
-      <h2>轮询与并发</h2>
-      <div class="rowline" style="margin-bottom:10px">
+      <h2>多账号轮询</h2>
+      <div class="rowline" style="margin-bottom:6px">
         <label class="note"><input type="checkbox" id="poll-toggle"> 启用多账号轮询</label>
-        <label class="note"><input type="radio" name="poll-mode" value="round-robin" checked> 顺序轮换</label>
-        <label class="note"><input type="radio" name="poll-mode" value="least-used"> 优先低消耗</label>
+        <label class="note"><input type="radio" name="poll-mode" value="round-robin"> 顺序轮换</label>
+        <label class="note"><input type="radio" name="poll-mode" value="credit-priority"> 优先低消耗</label>
       </div>
+      <div class="explain">多账号时每次请求自动切换账号分摊用量。<b>顺序轮换</b>＝按账号列表轮着用；
+        <b>优先低消耗</b>＝优先用剩余积分最多的账号。只有 1 个账号时此项无效（按钮置灰）。</div>
+    </div>
+    <div class="card">
+      <h2>签到与上游</h2>
       <div class="rowline">
         <label class="note">签到间隔(秒)</label>
         <input class="kinput" id="set-checkin-interval" value="{{CHECKIN_INTERVAL}}" style="width:90px">
         <label class="note">自定义上游(可选)</label>
-        <input class="kinput" id="set-base-url" placeholder="留空用默认" style="min-width:260px">
+        <input class="kinput" id="set-base-url" placeholder="留空用默认网关" style="min-width:240px">
         <button class="btn primary" id="settings-save">保存设置</button>
       </div>
+      <div class="explain"><b>签到间隔</b>＝一键签到时相邻两个账号之间的等待秒数（错峰防风控）；
+        <b>自定义上游</b>＝覆盖 Trae API 网关地址，日常请留空用默认值。</div>
       <div class="msg" id="settings-msg"></div>
       <hr class="sep">
-      <div class="note">账号安全：每账号并发上限 2，失败回合不会自动重放（防重复扣分）。
-        验证连接请用小 max_tokens；模型表有 TTL 缓存，不会逐请求打上游。</div>
-    </div>
-    <div class="card">
-      <h2>服务</h2>
-      <div class="rowline">
-        <button class="btn danger" id="stop-btn">停止服务</button>
-        <span class="note">停止后需手动运行 start-trae2api.cmd 恢复</span>
-      </div>
-      <div class="msg" id="service-msg"></div>
+      <div class="explain">账号安全：每账号并发上限 2；失败回合不会自动重放（防重复扣分）；
+        模型表有 TTL 缓存，不会逐请求打上游；积分列为按模型费率的估算值（带 ≈）。</div>
     </div>
   </section>
 
@@ -422,7 +432,8 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
-const state = { traceId: '', win: null, models: [], allowlist: [], activeAccount: '' };
+const FULL_API_KEY = "{{API_KEY_FULL}}";
+const state = { traceId: '', win: null, models: [], allowlist: [], activeAccount: '', accounts: [] };
 
 /* ───── feedback ───── */
 let toastTimer = null;
@@ -443,14 +454,38 @@ function showMsg(id, text, ok, timeout) {
   el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
   showToast(ok ? '成功' : '操作失败', text, ok, timeout === undefined ? (ok ? 3000 : 9000) : timeout);
 }
-function escapeHtml(value) {
-  return String(value === undefined || value === null ? '' : value)
+function escapeHtml(v) {
+  return String(v === undefined || v === null ? '' : v)
     .replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 }
 function setBusy(btn, busy) {
   if (!btn) return;
   btn.disabled = !!busy;
   btn.classList.toggle('loading', !!busy);
+}
+
+/* ───── formatters ───── */
+function fmtTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  const hm = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  return (d.toDateString() === now.toDateString() ? '' : (p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ')) + hm;
+}
+function fmtTokens(n) {
+  if (n === undefined || n === null) return '—';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + ' M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + ' k';
+  return String(n);
+}
+function fmtDur(ms) {
+  if (ms === undefined || ms === null) return '—';
+  return (ms / 1000).toFixed(2) + ' s';
+}
+function fmtCredits(c) {
+  if (c === undefined || c === null) return '—';
+  return '≈' + Number(c).toFixed(2);
 }
 
 /* ───── fetch helpers ───── */
@@ -464,9 +499,7 @@ async function requestJSON(url, init, timeoutMs) {
     return { ok: r.ok, status: r.status, data: data };
   } catch (e) {
     return { ok: false, status: 0, data: { error: String(e) } };
-  } finally {
-    clearTimeout(timer);
-  }
+  } finally { clearTimeout(timer); }
 }
 async function postJSON(url, payload, timeoutMs) {
   const result = await requestJSON(url, {
@@ -516,7 +549,6 @@ function randomDigits(n) {
   return s;
 }
 function buildAuthUrl() {
-  // Trae forces the callback onto 127.0.0.1, so the local helper forwards it.
   const cb = 'http://127.0.0.1:{{LISTENER_PORT}}/authorize';
   const mid = randomHex(32), did = randomDigits(19);
   const p = new URLSearchParams({
@@ -552,12 +584,14 @@ async function startAuth() {
     if (!w) { showMsg('auth-msg', '浏览器已拦截弹窗，请允许后重试', false); return; }
     state.win = w;
     setBusy(btn, true);
-    showMsg('auth-msg', '请在弹出的 Trae 授权页完成登录…', true, 8000);
+    showMsg('auth-msg', '请在弹出的 Trae 授权页完成登录…', true);
     const poll = setInterval(() => {
       if (w.closed) {
         clearInterval(poll);
         setBusy(btn, false);
+        showMsg('auth-msg', '');
         loadAccounts();
+        loadCheckinHistory();
       }
     }, 700);
   } catch (e) {
@@ -573,7 +607,7 @@ function avatarColor(id) {
   for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
-function fmtCredits(c) {
+function fmtCreditsRaw(c) {
   if (!c) return '—';
   if (c.unlimited) return '不限';
   const rem = c.remaining !== undefined && c.remaining !== null ? c.remaining : c.total_limit;
@@ -588,37 +622,43 @@ async function loadAccounts() {
     return;
   }
   const accounts = d.accounts || [];
+  state.accounts = accounts;
   state.activeAccount = d.active || state.activeAccount;
   $('ov-accounts').textContent = String(accounts.length);
   $('ov-accounts-sub').textContent = accounts.length
     ? '当前：' + ((accounts.find((a) => a.id === state.activeAccount) || {}).label || state.activeAccount || '—')
     : '还没有账号，先授权登录';
+  // overview credits = active account's general credits
+  const active = accounts.find((a) => a.id === state.activeAccount) || accounts[0];
+  const gen = active && ((active.credits && active.credits.account_credits) || active.account_credits);
+  $('ov-credits').textContent = fmtCreditsRaw(gen);
+  applyPollingGate();
   if (!accounts.length) {
-    grid.innerHTML = '<div class="empty">还没有账号，点右上角「授权登录」添加</div>';
+    grid.innerHTML = '<div class="empty">还没有账号，点上方「使用 Trae 网页授权登录」添加</div>';
     return;
   }
   grid.innerHTML = accounts.map((a) => {
-    const active = a.id === state.activeAccount;
+    const isActive = a.id === state.activeAccount;
     const general = (a.credits && a.credits.account_credits) || a.account_credits || null;
     const total = (a.credits && a.credits.total_credits) || a.total_credits || null;
     const checked = a.checked_in || (a.checkin && a.checkin.checked_in);
     return `
-      <div class="acard${active ? ' active' : ''}" data-account-id="${escapeHtml(a.id)}">
+      <div class="acard${isActive ? ' active' : ''}" data-account-id="${escapeHtml(a.id)}">
         <div class="top">
           <div class="avatar" style="background:${avatarColor(a.id)}">${escapeHtml((a.label || a.user_id || '?').slice(0, 1).toUpperCase())}</div>
           <div class="who">
-            <b>${escapeHtml(a.label || a.user_id || a.id)}${active ? ' <span class="tag ok">当前</span>' : ''}</b>
+            <b>${escapeHtml(a.label || a.user_id || a.id)}${isActive ? ' <span class="tag ok">当前</span>' : ''}</b>
             <span>${escapeHtml(a.user_id || a.id)}</span>
           </div>
         </div>
         <div class="credits">
-          <div class="mini-kv"><div class="k">通用积分</div><div class="v">${fmtCredits(general)}</div></div>
-          <div class="mini-kv"><div class="k">总积分</div><div class="v">${fmtCredits(total)}</div></div>
+          <div class="mini-kv"><div class="k">通用积分</div><div class="v">${fmtCreditsRaw(general)}</div></div>
+          <div class="mini-kv"><div class="k">总积分</div><div class="v">${fmtCreditsRaw(total)}</div></div>
           <div class="mini-kv"><div class="k">签到</div><div class="v">${checked ? '<span class="tag ok">已签</span>' : '<span class="tag cool">未签</span>'}</div></div>
         </div>
         <div class="acts">
           <button class="btn${checked ? ' done' : ' primary'}" data-action="checkin" data-id="${escapeHtml(a.id)}">${checked ? '今日已签到' : '签到'}</button>
-          <button class="btn" data-action="switch" data-id="${escapeHtml(a.id)}"${active ? ' disabled' : ''}>切换</button>
+          <button class="btn" data-action="switch" data-id="${escapeHtml(a.id)}"${isActive ? ' disabled' : ''}>切换</button>
           <button class="btn danger" data-action="remove" data-id="${escapeHtml(a.id)}">删除</button>
         </div>
       </div>`;
@@ -630,13 +670,15 @@ async function checkinAccount(id) {
   try {
     const d = await postJSON('/api/checkin/claim', { account_id: id }, 30000);
     if (d.success) {
-      showMsg('account-msg', '签到成功' + (d.credits !== undefined ? '，积分 +' + d.credits : ''), true);
+      const gained = d.credits !== undefined && d.credits !== null ? '，积分 +' + d.credits : '';
+      showMsg('account-msg', (d.skipped ? '今日已签过到' + gained : '签到成功' + gained), true);
     } else {
       showMsg('account-msg', d.error || '签到失败', false);
     }
   } finally {
     setBusy(btn, false);
     loadAccounts();
+    loadCheckinHistory();
   }
 }
 async function checkinAll() {
@@ -645,10 +687,11 @@ async function checkinAll() {
   try {
     const d = await postJSON('/api/checkin/claim-all', {}, 60000);
     const ok = d && (d.ok !== false && d.success !== false);
-    showMsg('account-msg', ok ? ('签到完成：' + (d.checked || d.message || '见账号卡状态')) : (d.error || '签到失败'), ok);
+    showMsg('account-msg', ok ? '批量签到完成，明细见签到记录' : (d.error || '签到失败'), ok);
   } finally {
     setBusy(btn, false);
     loadAccounts();
+    loadCheckinHistory();
   }
 }
 async function refreshCredits() {
@@ -658,13 +701,6 @@ async function refreshCredits() {
     const result = await requestJSON('/api/checkin/credits/accounts', { method: 'GET' }, 30000);
     const d = result.data;
     if (result.ok && d && d.success !== false) {
-      const accounts = d.accounts || [];
-      let sum = 0, any = false;
-      accounts.forEach((a) => {
-        const c = a.credits && a.credits.account_credits;
-        if (c && !c.unlimited) { sum += Number(c.remaining || 0); any = true; }
-      });
-      $('ov-credits').textContent = any ? sum.toFixed(0) : '—';
       showMsg('account-msg', '积分已刷新', true);
     } else {
       showMsg('account-msg', apiError(d, result.status), false);
@@ -702,6 +738,23 @@ document.addEventListener('click', (e) => {
   else if (action === 'switch') switchAccount(id);
   else if (action === 'remove') removeAccount(id);
 });
+async function loadCheckinHistory() {
+  const result = await requestJSON('/api/checkin/history', { method: 'GET' }, 10000);
+  const d = result.data;
+  const body = $('checkin-history-body');
+  if (!body) return;
+  const rows = (d && d.records) || [];
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="3" class="empty">还没有签到记录——签到成功后会记在这里</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.slice(0, 20).map((r) => `
+    <tr>
+      <td class="mono">${fmtTime(r.timestamp)}</td>
+      <td>${escapeHtml(r.label || r.account_id || '—')}</td>
+      <td class="mono">${r.credits !== undefined && r.credits !== null ? '+' + escapeHtml(String(r.credits)) : '—'}</td>
+    </tr>`).join('');
+}
 
 /* ───── allowlist & models ───── */
 async function loadAllowlist() {
@@ -737,7 +790,7 @@ function fillModelOptions() {
   if (connSel) connSel.innerHTML = options || '<option>先点「刷新模型列表」</option>';
 }
 async function refreshModels() {
-  const btn = $('models-refresh') || $('quick-models');
+  const btn = $('models-refresh');
   setBusy(btn, true);
   try {
     const result = await requestJSON('/v1/models?refresh=1', { method: 'GET' }, 30000);
@@ -801,40 +854,66 @@ $('allow-add').addEventListener('click', () => {
 });
 
 /* ───── usage ───── */
-function usageRows(rows, limit) {
-  const list = (rows || []).slice(0, limit || rows.length);
-  return list.map((r) => `
-    <tr>
-      <td class="mono">${escapeHtml(r.time || r.created_at || r.timestamp || '—')}</td>
-      <td class="mono">${escapeHtml(r.model || '—')}</td>
-      <td>${escapeHtml(r.product || r.product_side || r.client || 'api')}</td>
-      ${limit ? '' : `<td>${r.status ? '<span class="badge ' + (String(r.status).toLowerCase().indexOf('ok') >= 0 || r.status === 200 ? 'ok' : 'bad') + '">' + escapeHtml(String(r.status)) + '</span>' : '<span class="badge ok">200</span>'}</td>
-      <td class="mono">${r.prompt_tokens !== undefined ? escapeHtml(String(r.prompt_tokens)) : '—'}</td>
-      <td class="mono">${r.completion_tokens !== undefined ? escapeHtml(String(r.completion_tokens)) : '—'}</td>`}
-      <td class="mono">${r.credits !== undefined && r.credits !== null ? escapeHtml(String(r.credits)) : '—'}</td>
-      ${limit ? '' : `<td class="mono">${r.ttfb_ms !== undefined ? escapeHtml(String(r.ttfb_ms)) : '—'}</td>`}
-      <td class="mono">${r.elapsed_ms !== undefined ? escapeHtml(String(r.elapsed_ms)) : '—'}</td>
-    </tr>`).join('');
+function usageRows(rows) {
+  return (rows || []).map((r) => {
+    const st = String(r.status || '').toLowerCase();
+    const ok = st === 'completed' || st === 'ok';
+    const statusHtml = ok
+      ? '<span class="badge ok">200 完成</span>'
+      : '<span class="badge bad">' + escapeHtml(r.status || '失败') + '</span>';
+    return `
+      <tr>
+        <td class="mono">${fmtTime(r.timestamp)}</td>
+        <td class="mono">${escapeHtml(r.model || '—')}</td>
+        <td class="mono">${escapeHtml((r.endpoint || '').replace('/v1/', '') || '—')}</td>
+        <td>${statusHtml}</td>
+        <td class="mono">${fmtTokens(r.prompt_tokens)}</td>
+        <td class="mono">${fmtTokens(r.completion_tokens)}</td>
+        <td class="mono">${fmtCredits(r.credits_consumed)}</td>
+        <td class="mono">${fmtDur(r.ttfb_ms)}</td>
+        <td class="mono">${fmtDur(r.duration_ms)}</td>
+      </tr>`;
+  }).join('');
 }
 async function refreshUsage() {
   const result = await requestJSON('/api/usage/records', { method: 'GET' }, 15000);
   const d = result.data;
   const rows = (d && (d.records || d.data)) || (Array.isArray(d) ? d : []);
   const body = $('usage-body');
-  const ovBody = $('ov-usage-body');
   if (!result.ok) {
-    const msg = apiError(d, result.status);
-    if (body) body.innerHTML = '<tr><td colspan="9" class="empty">加载失败：' + escapeHtml(msg) + '</td></tr>';
-    if (ovBody) ovBody.innerHTML = '<tr><td colspan="5" class="empty">加载失败</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="empty">加载失败：' + escapeHtml(apiError(d, result.status)) + '</td></tr>';
     return;
   }
-  if (!rows.length) {
-    if (body) body.innerHTML = '<tr><td colspan="9" class="empty">暂无记录——发起一次 /v1/chat/completions 后再来看</td></tr>';
-    if (ovBody) ovBody.innerHTML = '<tr><td colspan="5" class="empty">暂无记录</td></tr>';
+  body.innerHTML = rows.length
+    ? usageRows(rows)
+    : '<tr><td colspan="9" class="empty">暂无记录——发起一次 /v1/chat/completions 后再来看</td></tr>';
+}
+
+/* ───── overview summary + trend ───── */
+async function loadSummary() {
+  const result = await requestJSON('/api/usage/summary', { method: 'GET' }, 12000);
+  const d = result.data;
+  if (!result.ok || !d || !d.success) return;
+  $('ov-tokens').textContent = fmtTokens(d.total_tokens);
+  $('ov-today-tokens').textContent = fmtTokens(d.today_tokens);
+  $('ov-today-credits').textContent = d.today_credits !== null && d.today_credits !== undefined ? '≈' + Number(d.today_credits).toFixed(2) : '—';
+  $('ov-today-credits-sub').textContent = d.credits_estimated ? '按模型费率估算' : '上游计费';
+  const trend = $('trend');
+  const days = d.trend || [];
+  if (!days.length) {
+    trend.innerHTML = '<div class="empty" style="width:100%">还没有用量数据</div>';
     return;
   }
-  if (body) body.innerHTML = usageRows(rows);
-  if (ovBody) ovBody.innerHTML = usageRows(rows, 5);
+  const max = Math.max.apply(null, days.map((x) => x.tokens)) || 1;
+  trend.innerHTML = days.map((x, i) => {
+    const h = Math.max(3, Math.round(x.tokens / max * 108));
+    const label = x.tokens >= 1e6 ? (x.tokens / 1e6).toFixed(1) + 'M' : x.tokens >= 1e3 ? (x.tokens / 1e3).toFixed(0) + 'k' : x.tokens;
+    return `<div class="col">
+      <div class="num">${label}</div>
+      <div class="bar${i === days.length - 1 ? ' today' : ''}" style="height:${h}px"></div>
+      <div class="day">${i === days.length - 1 ? '今天' : escapeHtml(x.day)}</div>
+    </div>`;
+  }).join('');
 }
 
 /* ───── connectivity test ───── */
@@ -880,10 +959,9 @@ async function runConnTest() {
     const timeCell = job.row.querySelector('.conn-time');
     const detailCell = job.row.querySelector('.conn-detail');
     statusCell.textContent = '测试中…';
-    statusCell.style.color = 'var(--dim2)';
     try {
       const d = await postJSON('/api/model-test', { model: model, mode: job.mode, timeout: timeout }, (timeout + 20) * 1000);
-      timeCell.textContent = d.elapsed_ms !== undefined ? d.elapsed_ms + ' ms' : '—';
+      timeCell.textContent = fmtDur(d.elapsed_ms);
       const ok = d.success !== false && (d._http_ok || d.ok);
       if (ok) {
         passed++;
@@ -891,14 +969,12 @@ async function runConnTest() {
         detailCell.textContent = d.detail || d.preview || d.message || (job.mode === 'tool' ? '工具调用返回正常' : '文本回复正常');
       } else {
         statusCell.innerHTML = '<span class="badge bad">失败</span>';
-        statusCell.style.color = '';
         detailCell.textContent = d.error || apiError(d, d._http_status) || '未知错误';
       }
     } catch (e) {
       statusCell.innerHTML = '<span class="badge bad">失败</span>';
       detailCell.textContent = String(e);
     }
-    statusCell.style.color = '';
     done++;
     summary.textContent = done + '/' + jobs.length + ' 完成 · 通过 ' + passed;
   }
@@ -907,6 +983,13 @@ async function runConnTest() {
 }
 
 /* ───── settings & service ───── */
+function applyPollingGate() {
+  const single = state.accounts.length < 2;
+  ['poll-toggle'].forEach((id) => { const el = $(id); if (el) el.disabled = single; });
+  document.querySelectorAll('input[name=poll-mode]').forEach((el) => { el.disabled = single; });
+  const hint = $('poll-gate-hint');
+  if (hint) hint.style.display = single ? '' : 'none';
+}
 async function loadSettings() {
   const result = await requestJSON('/api/polling', { method: 'GET' }, 10000);
   const d = result.data;
@@ -935,38 +1018,56 @@ async function saveSettings() {
 }
 async function stopService() {
   if (!confirm('确定要停止 Trae2API 服务吗？\n\n停止后需手动运行 start-trae2api.cmd 重新启动。')) return;
-  const btn = $('stop-btn');
+  const btn = $('side-stop');
   setBusy(btn, true);
   try {
     const d = await postJSON('/api/stop', {}, 15000);
     if (d && (d.ok || d.success)) {
-      showMsg('service-msg', '正在停止服务…请用 start-trae2api.cmd 手动恢复', true, 8000);
+      showToast('服务', '正在停止服务…请用 start-trae2api.cmd 恢复', true, 8000);
       $('side-dot').classList.add('err');
       $('side-status').textContent = '已停止';
     } else {
-      showMsg('service-msg', (d && d.error) || '停止失败', false);
+      showToast('服务', (d && d.error) || '停止失败', false);
     }
   } catch (e) {
-    showMsg('service-msg', String(e), false);
+    showToast('服务', String(e), false);
   } finally {
     setBusy(btn, false);
   }
 }
 
-/* ───── status ───── */
+/* ───── status / copy ───── */
 async function loadStatus() {
   const result = await requestJSON('/healthz', { method: 'GET' }, 8000);
   const ok = result.ok;
-  $('ov-health').textContent = ok ? '运行中' : '不可达';
   $('side-status').textContent = ok ? '服务运行中' : '服务不可达';
   $('side-dot').classList.toggle('err', !ok);
   const status = await requestJSON('/v1/status', { method: 'GET' }, 8000);
   if (status.ok && status.data) {
     const d = status.data;
-    $('ov-mode').textContent = d.upstream_mode || '{{UPSTREAM_MODE}}';
     $('foot-mode').textContent = d.upstream_mode || '{{UPSTREAM_MODE}}';
   }
 }
+document.querySelectorAll('[data-copy]').forEach((el) => {
+  el.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(el.getAttribute('data-copy'));
+      showToast('复制', '已复制到剪贴板', true);
+    } catch (e) {
+      showToast('复制', '复制失败：' + String(e), false);
+    }
+  });
+});
+$('acc-key-copy').addEventListener('click', async () => {
+  try {
+    const result = await requestJSON('/api/usage/records', { method: 'GET' }, 5000);
+    void result;
+    await navigator.clipboard.writeText(FULL_API_KEY);
+    showToast('复制', 'API Key 已复制', true);
+  } catch (e) {
+    showToast('复制', String(e), false);
+  }
+});
 
 /* ───── wire up ───── */
 async function addManualAccount() {
@@ -991,28 +1092,24 @@ async function addManualAccount() {
   }
 }
 $('manual-add').addEventListener('click', addManualAccount);
-$('ov-refresh').addEventListener('click', () => { loadStatus(); loadAccounts(); refreshCredits(); });
-$('ov-checkin').addEventListener('click', checkinAll);
-$('acct-checkin').addEventListener('click', checkinAll);
+$('ov-refresh').addEventListener('click', () => { loadStatus(); loadAccounts(); loadSummary(); });
 $('acct-refresh').addEventListener('click', refreshCredits);
-$('acct-auth').addEventListener('click', startAuth);
+$('acct-checkin').addEventListener('click', checkinAll);
 $('auth-btn').addEventListener('click', startAuth);
 $('models-refresh').addEventListener('click', refreshModels);
 $('allow-save').addEventListener('click', saveAllowlist);
 $('usage-refresh').addEventListener('click', refreshUsage);
 $('conn-run-btn').addEventListener('click', runConnTest);
 $('settings-save').addEventListener('click', saveSettings);
-$('stop-btn').addEventListener('click', stopService);
-$('quick-auth').addEventListener('click', () => { goto('accounts'); startAuth(); });
-$('quick-conn').addEventListener('click', () => { goto('conn'); runConnTest(); });
-$('quick-models').addEventListener('click', () => { goto('models'); refreshModels(); });
-$('quick-usage').addEventListener('click', () => { goto('usage'); refreshUsage(); });
+$('side-stop').addEventListener('click', stopService);
 
 (async function boot() {
   loadStatus();
   loadAccounts();
+  loadSummary();
   loadAllowlist();
   loadSettings();
+  loadCheckinHistory();
   refreshUsage();
   refreshModels();
 })();

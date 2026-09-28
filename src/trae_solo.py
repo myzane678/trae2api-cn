@@ -351,6 +351,24 @@ _models_cache: list[dict] = []
 _models_cached_at = 0.0
 
 
+def cached_models() -> list[dict]:
+    """Current in-memory model catalog (possibly empty before first fetch)."""
+    return list(_models_cache)
+
+
+def model_credit_rate(model: str) -> Optional[float]:
+    """Catalog credit rate for one model id (None when unknown)."""
+    key = str(model or "").strip().lower()
+    for entry in _models_cache:
+        if str(entry.get("id") or "").strip().lower() == key:
+            rate = entry.get("credit_rate")
+            try:
+                return float(rate) if rate is not None else None
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
 async def get_models(
     client: httpx.AsyncClient, token: str, user_id: str, *, force: bool = False
 ) -> list[dict]:

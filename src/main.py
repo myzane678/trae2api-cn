@@ -325,6 +325,8 @@ PUBLIC_PATHS = {
     "/api/checkin/work-credits",
     "/api/usage/last",
     "/api/usage/records",
+    "/api/usage/summary",
+    "/api/checkin/history",
     "/api/allowlist",
     "/api/model-test",
     "/api/stop",
@@ -692,12 +694,14 @@ def _web_login_html() -> str:
     template_path = Path(__file__).resolve().parent / "web" / "admin.html"
     html = template_path.read_text("utf-8")
     api_key = API_KEYS[0] if API_KEYS else ""
+    masked = (api_key[:12] + "…" + api_key[-4:]) if len(api_key) > 20 else (api_key or "未设置")
     values = {
         "UPSTREAM_MODE": html_mod.escape(UPSTREAM_MODE),
         "LISTENER_PORT": str(LOCAL_LISTENER_PORT),
         "CLIENT_ID": html_mod.escape(TRAE_CLIENT_ID),
         "AUTH_URL": html_mod.escape(TRAE_AUTH_URL),
-        "API_KEY": html_mod.escape(api_key or "未设置"),
+        "API_KEY_MASKED": html_mod.escape(masked),
+        "API_KEY_FULL": api_key,
         "CHECKIN_INTERVAL": str(int(CHECKIN_INTERVAL)),
     }
     for key, value in values.items():
@@ -1591,11 +1595,13 @@ def _usage_values(usage: Any) -> dict[str, Any]:
             "credits_cost",
             "credits_float",
         )
+    source = usage.get("credits_source") if isinstance(usage, Mapping) else None
     return {
         "prompt_tokens": int(prompt),
         "completion_tokens": int(completion),
         "total_tokens": int(total),
         "credits_consumed": credits,
+        "credits_source": str(source) if source else None,
     }
 
 
@@ -1932,7 +1938,10 @@ class _UsageTracker:
         final_status = status or self.status or "completed"
         values = self.usage
         explicit_credits = values.get("credits_consumed")
-        credits_source = "upstream" if explicit_credits is not None else "unknown"
+        credits_source = (
+            values.get("credits_source")
+            or ("upstream" if explicit_credits is not None else "unknown")
+        )
         _record_usage(
             self.account_id,
             self.model,
@@ -1996,7 +2005,8 @@ def _track_usage_from_result(result: dict, model: str) -> None:
         values["prompt_tokens"],
         values["completion_tokens"],
         credits_consumed=values.get("credits_consumed"),
-        credits_source="upstream" if values.get("credits_consumed") is not None else "unknown",
+        credits_source=values.get("credits_source")
+        or ("upstream" if values.get("credits_consumed") is not None else "unknown"),
     )
 
 
@@ -2023,7 +2033,8 @@ def _track_usage_from_chunk(chunk: str, model: str) -> None:
         values["prompt_tokens"],
         values["completion_tokens"],
         credits_consumed=values.get("credits_consumed"),
-        credits_source="upstream" if values.get("credits_consumed") is not None else "unknown",
+        credits_source=values.get("credits_source")
+        or ("upstream" if values.get("credits_consumed") is not None else "unknown"),
     )
 
 
@@ -3325,6 +3336,23 @@ async def _run_web_with_retry(
     return await run_web_session(messages, model, stream, options)
 
 
+def _attach_solo_credit_estimate(usage: Any, model: str) -> None:
+    """Attach an estimated credit cost to a SOLO usage snapshot.
+
+    The SOLO chat stream reports tokens only, so the cost is derived from the
+    catalog rate (credits per 1K total tokens) and explicitly labelled as
+    estimated; the usage table shows it with a tilde.
+    """
+    if not isinstance(usage, dict) or usage.get("credits_consumed") is not None:
+        return
+    rate = trae_solo.model_credit_rate(model)
+    if rate is None:
+        return
+    total = usage.get("total_tokens") or 0
+    usage["credits_consumed"] = round(rate * float(total) / 1000.0, 4)
+    usage["credits_source"] = "estimated"
+
+
 async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] = None):
     """SOLO ``llm_utils_chat`` channel: native tools and structured tool_calls.
 
@@ -3420,6 +3448,7 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
                                     )
                         elif evt == "token_usage":
                             usage = _map_usage(data.get("usage") or data)
+                            _attach_solo_credit_estimate(usage, model)
                         elif evt == "done":
                             final_reason = (
                                 _finish_reason(
@@ -3488,6 +3517,7 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
                     accumulator.add(raw_calls)
             elif evt == "token_usage":
                 usage = _map_usage(data.get("usage") or data)
+                _attach_solo_credit_estimate(usage, model)
             elif evt == "done":
                 final_reason = (
                     _finish_reason(
@@ -4202,6 +4232,56 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Trae CN Relay", version="1.2.0", lifespan=lifespan)
+
+
+@app.get("/api/usage/summary")
+async def usage_summary():
+    """Aggregates for the overview page: tokens/credits totals and 7-day trend."""
+    midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    total_tokens = today_tokens = 0
+    total_credits = today_credits = 0.0
+    credits_known = False
+    by_day: dict[str, int] = {}
+    with _USAGE_LOCK:
+        records = list(_USAGE_HISTORY)
+    for r in records:
+        if not isinstance(r, Mapping):
+            continue
+        tokens = int(_number_value(r.get("total_tokens")) or 0)
+        ts = _number_value(r.get("timestamp")) or 0
+        credits = _number_value(r.get("credits_consumed"))
+        total_tokens += tokens
+        if credits is not None:
+            credits_known = True
+            total_credits += float(credits)
+        if ts >= midnight:
+            today_tokens += tokens
+            if credits is not None:
+                today_credits += float(credits)
+        day = datetime.fromtimestamp(ts).strftime("%m-%d") if ts else "unknown"
+        by_day[day] = by_day.get(day, 0) + tokens
+    trend = [{"day": day, "tokens": by_day[day]} for day in sorted(by_day)[-7:]]
+    return {
+        "success": True,
+        "total_tokens": total_tokens,
+        "today_tokens": today_tokens,
+        "total_credits": round(total_credits, 2) if credits_known else None,
+        "today_credits": round(today_credits, 2) if credits_known else None,
+        "credits_estimated": any(
+            (r.get("credits_source") == "estimated") for r in records if isinstance(r, Mapping)
+        ),
+        "trend": trend,
+    }
+
+
+@app.get("/api/checkin/history")
+async def checkin_history():
+    try:
+        payload = json.loads(_CHECKIN_HISTORY_PATH.read_text("utf-8"))
+        records = payload.get("records", []) if isinstance(payload, dict) else []
+    except Exception:
+        records = []
+    return JSONResponse({"success": True, "records": records[-50:][::-1]})
 
 
 @app.get("/api/usage/records")
@@ -5302,6 +5382,36 @@ async def _claim_checkin_throttled(account_id: str, token: str) -> tuple[dict | 
         return data, 0
 
 
+_CHECKIN_HISTORY_PATH = Path(__file__).resolve().parent.parent / "data" / "checkin_history.json"
+
+
+def _append_checkin_history(account_id: str, credits: Any) -> None:
+    """Persist one accepted check-in (time + credits) for the console."""
+    try:
+        payload = {"version": 1, "records": []}
+        if _CHECKIN_HISTORY_PATH.exists():
+            try:
+                loaded = json.loads(_CHECKIN_HISTORY_PATH.read_text("utf-8"))
+                if isinstance(loaded, dict) and isinstance(loaded.get("records"), list):
+                    payload = loaded
+            except Exception:
+                pass
+        record = auth.get_account_record(account_id) or {}
+        payload["records"].append({
+            "account_id": account_id,
+            "label": record.get("label") or account_id,
+            "credits": _number_value(credits),
+            "timestamp": time.time(),
+        })
+        payload["records"] = payload["records"][-50:]
+        _CHECKIN_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary = _CHECKIN_HISTORY_PATH.with_name(_CHECKIN_HISTORY_PATH.name + ".tmp")
+        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", "utf-8")
+        os.replace(temporary, _CHECKIN_HISTORY_PATH)
+    except Exception as exc:
+        logger.warning("checkin history could not be saved: %s", exc)
+
+
 async def _claim_checkin_account(account_id: str) -> dict:
     """Lock, use today's cache when available, and send at most one claim."""
     lock = _checkin_account_lock(account_id)
@@ -5384,6 +5494,14 @@ async def _claim_checkin_account(account_id: str) -> dict:
         _checkin_clear_retry_state(account_id)
         latest = {**before, "checked_in": True, "verification_pending": True}
         _checkin_mark_accepted(account_id, latest, pending=True)
+        claimed_credits = (
+            _number_value(data.get("credits"))
+            if isinstance(data, Mapping)
+            else None
+        )
+        if claimed_credits is None and isinstance(data, Mapping):
+            claimed_credits = _number_value(data.get("extra_credits"))
+        _append_checkin_history(account_id, claimed_credits)
 
         payload = {
             **latest,
