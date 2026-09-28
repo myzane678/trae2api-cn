@@ -1,5 +1,16 @@
-# stop-trae2api-helper.ps1 - kill TRAE relay (8092) and OAuth login helper (8765)
-# Called by stop-trae2api.cmd; safe to run repeatedly.
+# stop-trae2api-helper.ps1 - kill TRAE relay (8092), OAuth login helper (8765)
+# and the admin console Chrome app window. Called by stop-trae2api.cmd; safe
+# to run repeatedly.
+
+# Close the console window first: Chrome runs with an isolated user-data-dir
+# under data\admin-profile and a marker flag on the command line, so only this
+# project's console matches - the user's daily Chrome is never touched.
+$consoles = Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*--trae2api-admin-window*' }
+foreach ($proc in $consoles) {
+    Write-Output ("[trae2api] console window: closing pid {0}" -f $proc.ProcessId)
+    taskkill /PID $proc.ProcessId /T /F | Out-Null
+}
 
 $targets = @(
     @{ Port = 8092; Name = 'relay' },

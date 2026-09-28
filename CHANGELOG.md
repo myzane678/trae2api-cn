@@ -1,5 +1,16 @@
 # CHANGELOG — trae2api-cn
 
+## v24 (2026-09-27)：桌面一键启动对齐（launch.vbs / 桌面快捷方式）
+
+- **对齐 kuku/mimo/workbuddy 的「点击即启动」形态**：新增 `launch.vbs`（薄壳，wscript
+  隐藏调 PowerShell，无黑窗）+ `start-trae2api-core.ps1`（核心逻辑：健康检查 → 按需
+  静默拉起 relay 8092 + OAuth 助手 8765 → 轮询 healthz 最多 20s → Chrome `--app` 无边框
+  窗口打开控制台，隔离 profile `data\admin-profile`）。已在跑时秒开控制台。
+- `start-trae2api.cmd` 重写为 core 的带输出版（原盲等 8s 改为健康轮询）；
+  `stop-trae2api-helper.ps1` 增加按 `--trae2api-admin-window` marker 关闭控制台窗口
+  （命令行匹配，不碰日常 Chrome）。桌面快捷方式「Trae2API 控制台.lnk」指向 launch.vbs。
+- 实测：launch 秒开控制台窗口、stop 只关窗口不中断 relay、重开正常。
+
 ## v23 (2026-09-27)：SOLO 原生工具通道上线（llm_utils_chat），文本提示桥退役
 
 - **换通道（核心）**：新增 `src/trae_solo.py`——SOLO `POST /api/agent/v3/llm_utils_chat`
