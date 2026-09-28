@@ -453,9 +453,14 @@ class CheckinResultTests(unittest.TestCase):
             [("token-0", "acct-0"), ("token-1", "acct-1"), ("token-2", "acct-2")],
         )
         self.assertEqual(sleep_calls, [7, 7])
-        self.assertEqual(status_calls, {})
+        # Each accepted claim queries today's status exactly once to learn the
+        # credited amount (the claim response itself carries no number).
+        self.assertEqual(status_calls, {"token-0": 1, "token-1": 1, "token-2": 1})
         self.assertTrue(
             all(row["success"] and not row["skipped"] for row in body["accounts"])
+        )
+        self.assertTrue(
+            all(row.get("claimed_credits") == 100 for row in body["accounts"])
         )
 
     def test_9074_cooldown_suppresses_repeated_upstream_claim(self):

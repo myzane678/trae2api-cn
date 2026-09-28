@@ -5388,6 +5388,21 @@ async def _claim_checkin_throttled(account_id: str, token: str) -> tuple[dict | 
 _CHECKIN_HISTORY_PATH = Path(__file__).resolve().parent.parent / "data" / "checkin_history.json"
 
 
+def _extract_checkin_credits(payload: Any, depth: int = 0) -> Any:
+    """Find today's credited amount anywhere in a checkin status payload."""
+    if depth > 4 or not isinstance(payload, Mapping):
+        return None
+    for key in ("credits", "extra_credits", "credit_amount", "credits_float"):
+        value = _number_value(payload.get(key))
+        if value is not None:
+            return value
+    for value in payload.values():
+        found = _extract_checkin_credits(value, depth + 1)
+        if found is not None:
+            return found
+    return None
+
+
 def _append_checkin_history(account_id: str, credits: Any) -> None:
     """Persist one accepted check-in (time + credits) for the console."""
     try:
@@ -5497,18 +5512,22 @@ async def _claim_checkin_account(account_id: str) -> dict:
         _checkin_clear_retry_state(account_id)
         latest = {**before, "checked_in": True, "verification_pending": True}
         _checkin_mark_accepted(account_id, latest, pending=True)
-        claimed_credits = (
-            _number_value(data.get("credits"))
-            if isinstance(data, Mapping)
-            else None
-        )
-        if claimed_credits is None and isinstance(data, Mapping):
-            claimed_credits = _number_value(data.get("extra_credits"))
+        # The claim response itself carries no amount; query today's status
+        # once to learn what was actually credited.
+        claimed_credits = None
+        try:
+            status_payload = await trae_client.fetch_checkin_credits_status(
+                record.get("token") or "", account_id
+            )
+            claimed_credits = _extract_checkin_credits(status_payload)
+        except Exception as exc:
+            logger.warning("checkin status after claim failed: %s", exc)
         _append_checkin_history(account_id, claimed_credits)
 
         payload = {
             **latest,
             "success": True,
+            "claimed_credits": claimed_credits,
             "skipped": False,
             "claim_sent": True,
             "data": data,

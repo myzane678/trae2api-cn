@@ -678,8 +678,8 @@ async function checkinAccount(id) {
   try {
     const d = await postJSON('/api/checkin/claim', { account_id: id }, 30000);
     if (d.success) {
-      const gained = d.credits !== undefined && d.credits !== null ? '，积分 +' + d.credits : '';
-      showMsg('account-msg', (d.skipped ? '今日已签过到' + gained : '签到成功' + gained), true);
+      const gained = d.claimed_credits !== undefined && d.claimed_credits !== null ? '，本次 +' + d.claimed_credits : '';
+      showMsg('account-msg', (d.skipped ? '今日已签过到' : '签到成功' + gained) + '，积分余额见账号卡', true);
     } else {
       showMsg('account-msg', d.error || '签到失败', false);
     }
