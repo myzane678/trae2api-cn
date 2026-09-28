@@ -12,8 +12,8 @@
 | 登录 | 控制台授权按钮（或 `start-trae2api-login.cmd` 先行）；token 自动续期 |
 | 白名单 | `TRAE_MODEL_ALLOWLIST`（.env）+ 控制台勾选管理（data/model-allowlist.json 优先），现 14 个 |
 | 积分 | 总 4650（通用 2650 + Work 专属 2000），每日签到 |
-| 工具调用 | ✅ SOLO 原生通道（v23）：请求体原生 `tools`/`tool_choice`，SSE `event:output.tool_calls` 结构化返回，标准 OpenAI 流式 `tool_calls` delta。`tool_choice=auto` 自然问法实测主动调工具（2/2），多轮 tool-result 续轮正常。remote 文本提示桥仅作 `UPSTREAM_MODE=remote` 显式回退 |
-| 上游模式 | `UPSTREAM_MODE=solo`（默认）：`llm_utils_chat` + `function=solo_work_lite`，`X-Ide-Version: 0.1.52` 解锁现役 41 模型；remote/raw/ide/cli 等保留为诊断回退 |
+| 工具调用 | ✅ SOLO 原生通道（v23）：请求体原生 `tools`/`tool_choice`，SSE `event:output.tool_calls` 结构化返回，标准 OpenAI 流式 `tool_calls` delta。`tool_choice=auto` 自然问法实测主动调工具，多轮 tool-result 续轮正常 |
+| 上游模式 | `UPSTREAM_MODE=solo`（唯一路由）：`llm_utils_chat` + `function=solo_work_lite`，`X-Ide-Version: 0.1.52` 解锁现役模型。旧的 remote/raw/web/ide/cli 通道已于 v25 删除（结论见 CHANGELOG） |
 | 模型 | 现役 20 个白名单主力（glm-5.3、DeepSeek-V4.1/4-Pro/Flash、Seed-2.1-Pro-0915 256K、kimi-k3、qwen3.8-max、minimax-m3、step-5-preview…），控制台可勾选；费率/上下文窗口见「模型白名单」页 |
 | 积分 | 全部为通用积分（Work 专属已升级合并，TraeCode/TraeWork 通吃），SOLO 通道消耗通用积分 |
 | 已知问题 | tests 会污染 `.env`/`data/accounts.json`（跑完 pytest 要清 fixture 再启动）；auto 模型 id 不可用（用显式模型）；Work 通道（create_agent_task）加密字段锁在本地进程不可反代 |
@@ -29,8 +29,7 @@
 - OpenAI `tools` / `tool_choice` / `parallel_tool_calls` 兼容，流式输出标准 `delta.tool_calls`
 - Codex Responses API 兼容：支持文本流、`function_call`、`custom_tool_call`、namespace 工具及 `*_call_output` 续轮
 - 调用方工具桥接：请求中声明的 Windows 工作区、Shell、读写和编辑工具由 API 调用方执行，relay 只转发调用与结果
-- 六种上游模式：Trae raw chat、9router 风格 remote 会话、Trae CLI 子进程、旧版网页 remote、IDE chat 端点、可选 TraeWork native bridge
-- `auto` 与 `raw` 都只直连 Trae raw v2 `llm_raw_chat`，不会把请求留在 relay 缓存，也不会回退到 CLI/remote/web/IDE 模拟路径
+- 单一上游通道：SOLO `llm_utils_chat`（原生工具调用）。历史通道 raw/remote/web/ide/cli 已移除
 - 多账号管理：网页 UI 添加/切换/删除账号，round-robin 轮询
 - 网页 OAuth 登录：在浏览器中直接授权，无需手动抓取 JWT
 - 多账号轮询：每次请求自动切换到下一个有效账号，突破单账号并发限制

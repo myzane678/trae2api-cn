@@ -2244,15 +2244,13 @@ class MainCliSmokeTests(unittest.TestCase):
         web.assert_not_awaited()
         ide.assert_not_awaited()
 
-    def test_auto_plain_chat_uses_only_raw(self):
-        raw = AsyncMock(return_value=JSONResponse({"route": "raw"}))
-        remote = AsyncMock(side_effect=AssertionError("remote must not run in auto mode"))
-        cli = AsyncMock(side_effect=AssertionError("cli must not run in auto mode"))
+    def test_plain_chat_uses_solo_channel(self):
+        # SOLO is the shipping default; a plain chat request must land on
+        # run_solo_chat without touching the legacy channels.
+        solo = AsyncMock(return_value=JSONResponse({"route": "solo"}))
         with (
-            patch("src.main.UPSTREAM_MODE", "auto"),
-            patch("src.main.run_raw_chat", raw),
-            patch("src.main._run_remote_with_retry", remote),
-            patch("src.main.run_cli_chat", cli),
+            patch("src.main.UPSTREAM_MODE", "solo"),
+            patch("src.main.run_solo_chat", solo),
         ):
             response = self.client.post(
                 "/v1/chat/completions",
@@ -2261,10 +2259,8 @@ class MainCliSmokeTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"route": "raw"})
-        raw.assert_awaited_once()
-        remote.assert_not_awaited()
-        cli.assert_not_awaited()
+        self.assertEqual(response.json(), {"route": "solo"})
+        solo.assert_awaited_once()
 
     def test_web_mode_accepts_caller_owned_tools(self):
         web = AsyncMock(return_value=JSONResponse({"route": "web"}))
