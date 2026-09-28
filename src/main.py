@@ -2695,6 +2695,9 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
     if not token:
         raise RuntimeError("No Cloud-IDE-JWT token available")
     user_id = str(record.get("user_id") or account_id or "")
+    # The gateway is case-sensitive about model ids; map whatever the caller
+    # sent onto the catalog's exact spelling.
+    model = trae_solo.canonical_model(model)
     body = trae_solo.build_solo_body(
         messages,
         model,
@@ -3044,7 +3047,9 @@ async def _dispatch_chat(messages, model, stream: bool, options: Optional[dict] 
         )
     if not trae_client.is_model_supported(model):
         return _openai_error(400, f"Unsupported model: {model}", "invalid_request_error", "model")
-    if MODEL_ALLOWLIST and model.strip().lower() not in MODEL_ALLOWLIST:
+    if MODEL_ALLOWLIST and model.strip().lower() not in {
+        entry.lower() for entry in MODEL_ALLOWLIST
+    }:
         return _openai_error(
             403,
             f"model not allowed by TRAE_MODEL_ALLOWLIST: {model}",
@@ -3648,7 +3653,7 @@ async def api_allowlist_post(req: Request):
     ids = body.get("ids") if isinstance(body, dict) else None
     if not isinstance(ids, list):
         return JSONResponse({"success": False, "error": "ids array required"}, status_code=400)
-    cleaned = sorted({str(m).strip().lower() for m in ids if str(m).strip()})
+    cleaned = sorted({trae_solo.canonical_model(str(m).strip()) for m in ids if str(m).strip()})
     MODEL_ALLOWLIST.clear()
     MODEL_ALLOWLIST.update(cleaned)
     _save_allowlist_file()

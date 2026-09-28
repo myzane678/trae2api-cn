@@ -774,6 +774,10 @@ async function loadAllowlist() {
   state.allowlist = Array.isArray(list) ? list.map((m) => (typeof m === 'string' ? m : m.id || m.name)).filter(Boolean) : [];
   renderAllowlist();
 }
+function inAllowlist(id) {
+  const key = String(id || '').toLowerCase();
+  return state.allowlist.some((m) => String(m).toLowerCase() === key);
+}
 function renderAllowlist() {
   const chips = $('allow-chips');
   $('allow-count').textContent = state.allowlist.length ? state.allowlist.length + ' 个模型' : '未启用白名单（全部暴露）';
@@ -838,12 +842,12 @@ function renderModelRows() {
         <td class="mono">${m.max_output ? (m.max_output / 1000).toFixed(0) + 'K' : '—'}</td>
         <td>${m.multimodal ? '<span class="tag info">多模态</span> ' : ''}${escapeHtml(m.capability || '—')}</td>
         <td class="mono">${m.credit_rate !== undefined && m.credit_rate !== null ? escapeHtml(String(m.credit_rate)) : '—'}</td>
-        <td><button class="btn${state.allowlist.includes(m.id) ? ' done' : ''}" data-quick-add="${escapeHtml(m.id)}"${state.allowlist.includes(m.id) ? ' disabled' : ''}>${state.allowlist.includes(m.id) ? '已加入' : '＋'}</button></td>
+        <td><button class="btn${inAllowlist(m.id) ? ' done' : ''}" data-quick-add="${escapeHtml(m.id)}"${inAllowlist(m.id) ? ' disabled' : ''}>${inAllowlist(m.id) ? '已加入' : '＋'}</button></td>
       </tr>`).join('') || '<tr><td colspan="8" class="empty">无模型</td></tr>';
   body.querySelectorAll('[data-quick-add]').forEach((el) => {
     el.addEventListener('click', () => {
       const id = el.getAttribute('data-quick-add');
-      if (state.allowlist.includes(id)) return;
+      if (inAllowlist(id)) return;
       state.allowlist.push(id);
       renderAllowlist();
       renderModelRows();
@@ -867,7 +871,7 @@ $('allow-add').addEventListener('click', () => {
   const sel = $('allow-select');
   const id = sel.value;
   if (!id || id.startsWith('先点')) { showMsg('allow-msg', '先刷新模型列表', false); return; }
-  if (state.allowlist.includes(id)) { showMsg('allow-msg', id + ' 已在白名单', true); return; }
+  if (inAllowlist(id)) { showMsg('allow-msg', id + ' 已在白名单', true); return; }
   state.allowlist.push(id);
   renderAllowlist();
   showMsg('allow-msg', id + ' 已加入（记得保存）', true);

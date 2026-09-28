@@ -45,4 +45,7 @@ def _isolate_runtime_state(tmp_path, monkeypatch):
     monkeypatch.setattr(_auth, "ACCOUNTS_PATH", tmp_path / "accounts.json")
     monkeypatch.setattr(_main, "_USAGE_RECORDS_PATH", tmp_path / "usage_records.json")
     monkeypatch.setattr(_main, "_CHECKIN_HISTORY_PATH", tmp_path / "checkin_history.json")
+    # The console allowlist persists to data/model-allowlist.json; without this
+    # redirect a test run overwrites the operator's real allowlist.
+    monkeypatch.setattr(_main, "ALLOWLIST_PATH", str(tmp_path / "model-allowlist.json"))
     yield

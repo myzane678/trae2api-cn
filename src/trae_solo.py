@@ -394,6 +394,53 @@ def cached_models() -> list[dict]:
     return list(_models_cache)
 
 
+# Exact catalog spellings, captured from get_detail_param.  The gateway is
+# case-sensitive (``doubao-seed-2.1-pro`` -> business code 4001 while
+# ``Doubao-Seed-2.1-Pro`` works) and clients routinely lower-case model ids,
+# so canonicalization must work even before the live catalog is fetched.
+_KNOWN_MODEL_SPELLINGS = (
+    "Doubao-Seed-Evolving",
+    "Doubao-Seed-2.1-Pro",
+    "Doubao-Seed-2.1-Turbo",
+    "Doubao-Seed-2.0-Code",
+    "DeepSeek-V4-Flash",
+    "DeepSeek-V4-Flash-Official",
+    "DeepSeek-V4-Pro",
+    "DeepSeek-V4-Pro-Official",
+    "deepseek-v4.1-flash",
+    "seed-code-pro-0430",
+    "step-5-preview",
+    "kimi-k3",
+    "kimi-k2.7-code",
+    "kimi-k2.6",
+    "glm-5.3",
+    "glm-5.2",
+    "glm-5-turbo",
+    "glm-5",
+    "minimax-m3",
+    "qwen3.8-max",
+    "qwen-3.7-plus",
+)
+_KNOWN_BY_LOWER = {name.lower(): name for name in _KNOWN_MODEL_SPELLINGS}
+
+
+def canonical_model(name: str) -> str:
+    """Map a caller-supplied model id onto the catalog's exact spelling.
+
+    Checks the live catalog first (it also covers ids added upstream later),
+    then the known-spelling table so the mapping works before any catalog
+    fetch has happened.
+    """
+    key = str(name or "").strip()
+    if not key:
+        return key
+    lowered = key.lower()
+    for entry in _models_cache:
+        if str(entry.get("id") or "").lower() == lowered:
+            return str(entry["id"])
+    return _KNOWN_BY_LOWER.get(lowered, key)
+
+
 def model_credit_rate(model: str) -> Optional[float]:
     """Catalog credit rate for one model id (None when unknown)."""
     key = str(model or "").strip().lower()
