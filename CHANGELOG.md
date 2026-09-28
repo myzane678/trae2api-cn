@@ -1,5 +1,54 @@
 # CHANGELOG — trae2api-cn
 
+## v26 (2026-09-28)：并发 5 + 冷却状态机 + 模型健康度排查 + 账号风险加固
+
+### 与社区项目对比（本轮审计）
+
+| 维度 | trae2api-cn | workbuddy2api | kuku2api | trae2api-web |
+|---|---|---|---|---|
+| 工具调用 | ✅ SOLO 原生 tool_calls | ❌ 纯文本 | ✅ TOOL_CALL_* 事件 | ✅ 原生 |
+| 并发控制 | 信号量 5 + 冷却 | 无限制 | Mutex 串行 | 冷却状态机 |
+| 多账号 | round-robin + 切换 | CN/INTL 双区 | 池化 | 池化 |
+| API Key | 单 key | 多 key 分区 | 单 key | 单 key |
+| 模型管理 | 白名单 + 大小写映射 | 白名单 | 无 | 无 |
+| 统计 | 持久化聚合层 | stats.go | 简单 | 无 |
+
+**我们做的好的**：① 工具调用原生支持（ZCode 必需，workbuddy 没有）；
+② 冷却状态机 + 信号量组合（比 kuku 的 Mutex 串行更平衡）；
+③ 模型大小写映射（上游敏感）；④ 桌面一键启动（对齐 mimo/workbuddy）；
+⑤ 测试覆盖 365 项。
+
+**可改进项**（记录待办，暂未做）：① 多 API Key 分区路由（workbuddy）；
+② 请求最小间隔限流（kuku 的 lastCall）；③ 签到后积分>0 自动解冻冷却账号
+（trae2api-web 的 ReenableIfCredits）。
+
+
+
+- **并发上限调到 5**（`TRAE_SOLO_MAX_PARALLEL` 默认 5，可 1-10）：信号量配幂等 `release()`，
+  流式路径在 generator `finally` 释放、非流式路径在 return 前释放、异常路径兜底。
+  实测 6 并发 6/6 成功、第二轮无泄漏（验证信号量释放可靠）。
+- **冷却状态机**（承接 v25）：429/4011→60s、1005 权益→12h、其他上游错误→10m，
+  成功即解冻。与信号量互补（信号量限并发、冷却限错误重试）。
+- **模型健康度排查**：实测 6 个 DeepSeek 变体 + 3 个对照模型。`DeepSeek-V4-Flash/Pro`
+  首字 4-5s、工具调用 6-7s 全部正常；`deepseek-v4.1-flash` 上游固定排队 188-218s
+  （思考链仅 118 字符，是上游调度不是思考），已移出默认白名单。
+- **账号风险加固**：`auth.py` 启动日志不再打印 token 前 36 字符（改为长度）；
+  检查确认无提示词注入面（SOLO 纯透传）、无 verify=False、凭据目录已被 gitignore。
+- **源码审核**：删未用 `secrets` 导入、孤儿函数 `_remote_only_models`、过时的
+  remote/9router 文档字符串与轮询判断残留。
+
+## v25 (2026-09-28)：删除 remote 通道 + 前端照 workbuddy 重做
+
+- **删除 `trae_remote_client` 整个通道**（660 行 + 1395 行测试），连带清理 main.py 的
+  remote 路由/分派/导入，以及 4 个孤儿助手。`main.py` 从 5846 减至 5065 行。
+- **前端照 workbuddy2api 重做**：新增 `stats_agg.py` 持久化聚合层（日/模型/累计，
+  30 天保留），新增 `GET /api/stats` 一次返回整页数据；控制台换成独立 `admin.html`
+  （SVG 图标、hash 路由、卡片网格、双段柱状趋势图、conic 环形分布图、账号状态条、
+  勾选式模型白名单、设置视图）。
+- **白名单大小写与目录饥饿修复**：`canonical_model()` 把任意写法映射到目录原始拼写
+  （上游对 `doubao-seed-2.1-pro` 报 4001，须 `Doubao-Seed-2.1-Pro`）；`/v1/models?all=1`
+  返回完整目录（默认视图仍按白名单过滤），修掉「白名单变小就永远加不回来」的死循环。
+
 ## v24 (2026-09-27)：桌面一键启动对齐（launch.vbs / 桌面快捷方式）
 
 - **对齐 kuku/mimo/workbuddy 的「点击即启动」形态**：新增 `launch.vbs`（薄壳，wscript

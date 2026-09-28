@@ -10,13 +10,13 @@
 | 控制台 | `http://127.0.0.1:8092/web/login`（账号/积分/签到/白名单勾选/消费记录含首字耗时） |
 | 启停 | `start-trae2api.cmd`（8092 + 8765 助手）/ `stop-trae2api.cmd`，无窗口自关 |
 | 登录 | 控制台授权按钮（或 `start-trae2api-login.cmd` 先行）；token 自动续期 |
-| 白名单 | `TRAE_MODEL_ALLOWLIST`（.env）+ 控制台勾选管理（data/model-allowlist.json 优先），现 14 个 |
-| 积分 | 总 4650（通用 2650 + Work 专属 2000），每日签到 |
+| 白名单 | 控制台勾选管理（data/model-allowlist.json），默认 20 个可用模型；`/v1/models?all=1` 查完整目录 |
 | 工具调用 | ✅ SOLO 原生通道（v23）：请求体原生 `tools`/`tool_choice`，SSE `event:output.tool_calls` 结构化返回，标准 OpenAI 流式 `tool_calls` delta。`tool_choice=auto` 自然问法实测主动调工具，多轮 tool-result 续轮正常 |
 | 上游模式 | `UPSTREAM_MODE=solo`（唯一路由）：`llm_utils_chat` + `function=solo_work_lite`，`X-Ide-Version: 0.1.52` 解锁现役模型。旧的 remote/raw/web/ide/cli 通道已于 v25 删除（结论见 CHANGELOG） |
-| 模型 | 现役 20 个白名单主力（glm-5.3、DeepSeek-V4.1/4-Pro/Flash、Seed-2.1-Pro-0915 256K、kimi-k3、qwen3.8-max、minimax-m3、step-5-preview…），控制台可勾选；费率/上下文窗口见「模型白名单」页 |
-| 积分 | 全部为通用积分（Work 专属已升级合并，TraeCode/TraeWork 通吃），SOLO 通道消耗通用积分 |
-| 已知问题 | tests 会污染 `.env`/`data/accounts.json`（跑完 pytest 要清 fixture 再启动）；auto 模型 id 不可用（用显式模型）；Work 通道（create_agent_task）加密字段锁在本地进程不可反代 |
+| 模型 | 20 个主力（glm-5.x、DeepSeek-V4 系列、Doubao-Seed-2.x、kimi-k3、qwen3.8-max、minimax-m3、step-5-preview…），控制台勾选管理；费率/上下文窗口见「模型白名单」页 |
+| 积分 | 全部为通用积分（Work 专属已升级合并，TraeCode/TraeWork 通吃），SOLO 通道消耗通用积分；实测费率 ≈ 0.09 分/千token（豆包） |
+| 并发 | 每账号信号量上限 5（`TRAE_SOLO_MAX_PARALLEL` 可调）+ 冷却状态机（429→60s、1005→12h、其他错误→10m，成功即解冻） |
+| 已知问题 | deepseek-v4.1-flash 上游固定排队 188-218s，不适合交互式使用（已移出默认白名单，需要时可加回）；auto 模型 id 不可用（用显式模型）；Work 通道（create_agent_task）加密字段锁在本地进程不可反代 |
 
 **仅供学习使用。请勿用于商业用途。**
 

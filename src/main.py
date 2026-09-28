@@ -10,7 +10,6 @@ main.py - Trae CN Relay 中转站
   UPSTREAM_MODE=cli  - 只使用本地 Trae CLI 子进程
   UPSTREAM_MODE=auto - 与 raw 相同，所有模型请求直达 Trae 原生 chat 协议
   UPSTREAM_MODE=raw  - 直连 Trae 原生 chat 协议（direct 为别名）
-  UPSTREAM_MODE=remote/9router - 只用 9router 风格 remote 会话
   UPSTREAM_MODE=web  - 只用旧版 CN remote 会话（兼容保留）
   UPSTREAM_MODE=ide  - 只用 trae2api 风格 /api/ide/v1/chat
   UPSTREAM_MODE=traework-native - Windows helper 承载 TraeWork ai-agent.dll
@@ -1271,9 +1270,6 @@ def _bind_chat_session(
                 "raw",
                 "direct",
                 "web",
-                "remote",
-                "9router",
-                "trae-remote",
                 "auto",
             ):
                 auth.next_polling_account()
@@ -2019,19 +2015,6 @@ def _bind_usage_turn_from_metadata(metadata: Any) -> None:
         _bind_usage_turn(metadata.get("usage_turn_id"))
 
 
-def _remote_only_models() -> set[str]:
-    """Return explicit overrides for remote manual selection."""
-    raw = os.environ.get("TRAE_REMOTE_ONLY_MODELS", "")
-    configured: set[str] = set()
-    for item in raw.split(","):
-        value = item.strip().lower()
-        if value.startswith("trae/"):
-            value = value[5:]
-        if value:
-            configured.add(value)
-    return configured
-
-
 def _chunk_marks_terminal(chunk: Any) -> bool:
     """Whether an SSE chunk proves the response reached its end.
 
@@ -2717,25 +2700,32 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
         len(body.get("tools") or []),
         sum(1 for m in (messages or []) if isinstance(m, Mapping) and m.get("role") == "tool"),
     )
-    # Cool-down gate instead of a semaphore: a leaked semaphore blocked every
-    # later call on the account (requests hung for the full timeout with
-    # upstream_ready=False).  See trae_solo._COOLDOWN_SECONDS.
+    # Two guards, one per purpose:
+    #  - a per-account semaphore caps how many calls run at once (bursts look
+    #    like automation otherwise); it is released through an idempotent
+    #    closure called from every exit path, including the stream generator.
+    #  - a cooldown table keeps an account on the bench after an upstream-side
+    #    failure (see trae_solo._COOLDOWN_SECONDS).
     cooling, left, reason = await trae_solo.account_cooling(account_id)
     if cooling:
         raise RuntimeError(
             f"account {account_id} cooling down {int(left)}s ({reason})"
         )
+    gate = await trae_solo.account_gate(account_id)
+    await gate.acquire()
     client = httpx.AsyncClient(timeout=None)
     released = False
 
     async def release() -> None:
-        # The streaming response outlives this function: the HTTP client must
-        # stay alive until the generator finishes consuming.
+        # Idempotent: the streaming response outlives this function, so both
+        # the generator's finally and the outer except may call it.  The HTTP
+        # client must stay alive until the generator finishes consuming.
         nonlocal released
         if released:
             return
         released = True
         await client.aclose()
+        gate.release()
 
     try:
         event_iter = trae_solo.stream_events(client, token, user_id, body)
@@ -2872,6 +2862,7 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
             tool_calls=accumulator.calls() or None,
         )
         _track_usage_from_result(result, model)
+        await release()
         return JSONResponse(content=result)
     except BaseException:
         await release()

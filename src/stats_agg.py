@@ -13,7 +13,7 @@ import os
 import threading
 import time
 from datetime import datetime
-from typing import Any, Mapping, Optional
+from typing import Mapping, Optional
 
 logger = logging.getLogger("trae2api.stats")
 

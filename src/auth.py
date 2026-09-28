@@ -82,7 +82,9 @@ class AuthState:
 
     def log_summary(self) -> None:
         if self.token:
-            logger.info("auth: token=%s...", self.token[:36])
+            # Log only a fingerprint, never the JWT itself - a truncated token
+            # still leaks the header and the start of the payload.
+            logger.info("auth: token=<%d chars>", len(self.token))
         if self.user_id:
             logger.info("auth: user_id=%s", self.user_id)
         if self.expired_at:

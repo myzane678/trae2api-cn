@@ -488,6 +488,28 @@ _account_cooldown: dict[str, tuple[float, str]] = {}
 _cooldown_lock = asyncio.Lock()
 
 
+# ── per-account concurrency cap ──
+# The upstream tolerates a handful of parallel sessions per account.  A small
+# cap keeps bursts from looking like automation while leaving room for a
+# client that streams a few tool turns at once.  Release is idempotent and
+# every call path releases through try/finally - the earlier leak (a
+# semaphore slot released only by the stream generator) blocked the account
+# whenever a request aborted before the generator started.
+_account_gates: dict[str, asyncio.Semaphore] = {}
+_gates_lock = asyncio.Lock()
+
+
+async def account_gate(account_id: str) -> asyncio.Semaphore:
+    key = str(account_id or "default")
+    async with _gates_lock:
+        gate = _account_gates.get(key)
+        if gate is None:
+            limit = int(os.environ.get("TRAE_SOLO_MAX_PARALLEL", "5") or "5")
+            gate = asyncio.Semaphore(max(1, min(limit, 10)))
+            _account_gates[key] = gate
+        return gate
+
+
 async def account_cooling(account_id: str) -> tuple[bool, float, str]:
     """Return (cooling, seconds_left, reason) for one account."""
     key = str(account_id or "default")
