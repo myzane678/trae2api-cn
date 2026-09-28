@@ -6,21 +6,25 @@
 
 | 维度 | trae2api-cn | workbuddy2api | kuku2api | trae2api-web |
 |---|---|---|---|---|
-| 工具调用 | ✅ SOLO 原生 tool_calls | ❌ 纯文本 | ✅ TOOL_CALL_* 事件 | ✅ 原生 |
+| 工具调用 | ✅ SOLO 原生 tool_calls | ✅ 流式 delta 合并 | ✅ TOOL_CALL_* 事件 | ✅ 原生 |
+| 工具参数净化 | 清协议残留 | 防提示词注入 | 无 | 无 |
+| reasoning_effort | ❌ 无 | ✅ 按模型降级 | 无 | 无 |
 | 并发控制 | 信号量 5 + 冷却 | 无限制 | Mutex 串行 | 冷却状态机 |
 | 多账号 | round-robin + 切换 | CN/INTL 双区 | 池化 | 池化 |
 | API Key | 单 key | 多 key 分区 | 单 key | 单 key |
 | 模型管理 | 白名单 + 大小写映射 | 白名单 | 无 | 无 |
 | 统计 | 持久化聚合层 | stats.go | 简单 | 无 |
 
-**我们做的好的**：① 工具调用原生支持（ZCode 必需，workbuddy 没有）；
+**我们做得好的**：① 模型大小写映射（上游对 `doubao-seed-2.1-pro` 报 4001，workbuddy 无此处理）；
 ② 冷却状态机 + 信号量组合（比 kuku 的 Mutex 串行更平衡）；
-③ 模型大小写映射（上游敏感）；④ 桌面一键启动（对齐 mimo/workbuddy）；
-⑤ 测试覆盖 365 项。
+③ 协议残留清理（防止历史污染，workbuddy 是防注入目的不同）；
+④ 桌面一键启动（对齐 mimo/workbuddy）；⑤ 测试覆盖 365 项。
 
-**可改进项**（记录待办，暂未做）：① 多 API Key 分区路由（workbuddy）；
-② 请求最小间隔限流（kuku 的 lastCall）；③ 签到后积分>0 自动解冻冷却账号
-（trae2api-web 的 ReenableIfCredits）。
+**workbuddy 做得比我们好的**：① 防提示词注入的 sanitize；
+② reasoning_effort 按模型能力降级；③ 多 API Key 分区路由（CN/INTL 双区）。
+
+**可改进项**（记录待办）：① reasoning_effort 降级；② 防提示词注入净化；
+③ 请求最小间隔限流（kuku 的 lastCall）；④ 签到后积分>0 自动解冻（trae2api-web）。
 
 
 
