@@ -332,7 +332,7 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
       <h2>模型目录 <span class="hint">窗口 / 费率来自上游 get_detail_param</span></h2>
       <div class="tablewrap">
         <table>
-          <thead><tr><th>模型 ID</th><th>显示名</th><th>上下文</th><th>能力</th><th>积分费率</th><th></th></tr></thead>
+          <thead><tr><th>模型 ID</th><th>显示名</th><th>标称窗口</th><th>实际可用</th><th>最大输出</th><th>能力</th><th>积分费率</th><th></th></tr></thead>
           <tbody id="models-body"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
         </table>
       </div>
@@ -770,7 +770,7 @@ async function loadAllowlist() {
   const d = result.data;
   const chips = $('allow-chips');
   if (!result.ok || !d) { chips.innerHTML = '<span class="note">白名单加载失败</span>'; return; }
-  const list = d.models || d.allowlist || [];
+  const list = d.allowed || d.models || [];
   state.allowlist = Array.isArray(list) ? list.map((m) => (typeof m === 'string' ? m : m.id || m.name)).filter(Boolean) : [];
   renderAllowlist();
 }
@@ -811,41 +811,53 @@ async function refreshModels() {
       id: m.id,
       display_name: m.display_name || m.id,
       context_window: m.context_window || 0,
+      advertised: m.context_window_advertised || 0,
+      prompt_max: m.prompt_max_tokens || 0,
+      max_output: m.max_output_tokens || 0,
       capability: m.capability || '',
       credit_rate: m.credit_rate,
       is_new: !!m.is_new,
       multimodal: !!m.multimodal,
     }));
     fillModelOptions();
-    const body = $('models-body');
-    body.innerHTML = state.models.map((m) => `
-      <tr>
-        <td class="mono">${escapeHtml(m.id)}${m.is_new ? ' <span class="tag new">NEW</span>' : ''}</td>
-        <td>${escapeHtml(m.display_name)}</td>
-        <td class="mono">${m.context_window ? (m.context_window / 1000).toFixed(0) + 'K' : '—'}</td>
-        <td>${m.multimodal ? '<span class="tag info">多模态</span> ' : ''}${escapeHtml(m.capability || '—')}</td>
-        <td class="mono">${m.credit_rate !== undefined && m.credit_rate !== null ? escapeHtml(String(m.credit_rate)) : '—'}</td>
-        <td><button class="btn" data-quick-add="${escapeHtml(m.id)}">＋</button></td>
-      </tr>`).join('') || '<tr><td colspan="6" class="empty">无模型</td></tr>';
-    body.querySelectorAll('[data-quick-add]').forEach((el) => {
-      el.addEventListener('click', () => {
-        const id = el.getAttribute('data-quick-add');
-        if (!state.allowlist.includes(id)) { state.allowlist.push(id); renderAllowlist(); }
-        showMsg('allow-msg', id + ' 已加入白名单（记得点保存）', true);
-      });
-    });
+    renderModelRows();
     showMsg('allow-msg', '模型列表已刷新：' + state.models.length + ' 个', true);
   } finally {
     setBusy(btn, false);
   }
 }
+function renderModelRows() {
+  const body = $('models-body');
+  if (!body) return;
+  body.innerHTML = state.models.map((m) => `
+      <tr>
+        <td class="mono">${escapeHtml(m.id)}${m.is_new ? ' <span class="tag new">NEW</span>' : ''}</td>
+        <td>${escapeHtml(m.display_name)}</td>
+        <td class="mono">${m.advertised ? (m.advertised / 1000).toFixed(0) + 'K' : '—'}</td>
+        <td class="mono">${m.prompt_max ? (m.prompt_max / 1000).toFixed(0) + 'K' : '—'}</td>
+        <td class="mono">${m.max_output ? (m.max_output / 1000).toFixed(0) + 'K' : '—'}</td>
+        <td>${m.multimodal ? '<span class="tag info">多模态</span> ' : ''}${escapeHtml(m.capability || '—')}</td>
+        <td class="mono">${m.credit_rate !== undefined && m.credit_rate !== null ? escapeHtml(String(m.credit_rate)) : '—'}</td>
+        <td><button class="btn${state.allowlist.includes(m.id) ? ' done' : ''}" data-quick-add="${escapeHtml(m.id)}"${state.allowlist.includes(m.id) ? ' disabled' : ''}>${state.allowlist.includes(m.id) ? '已加入' : '＋'}</button></td>
+      </tr>`).join('') || '<tr><td colspan="8" class="empty">无模型</td></tr>';
+  body.querySelectorAll('[data-quick-add]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-quick-add');
+      if (state.allowlist.includes(id)) return;
+      state.allowlist.push(id);
+      renderAllowlist();
+      renderModelRows();
+      showMsg('allow-msg', id + ' 已加入白名单（记得点「保存白名单」生效）', true);
+    });
+  });
+}
 async function saveAllowlist() {
   const btn = $('allow-save');
   setBusy(btn, true);
   try {
-    const d = await postJSON('/api/allowlist', { models: state.allowlist }, 20000);
+    const d = await postJSON('/api/allowlist', { ids: state.allowlist }, 20000);
     if (d.success === false) { showMsg('allow-msg', d.error || '保存失败', false); return; }
-    showMsg('allow-msg', '白名单已保存', true);
+    showMsg('allow-msg', '白名单已保存（' + (d.count !== undefined ? d.count + ' 个模型' : '生效') + '）', true);
     loadAllowlist();
   } finally {
     setBusy(btn, false);

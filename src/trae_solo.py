@@ -321,14 +321,28 @@ async def fetch_model_catalog(
 
 
 def catalog_model_entry(config: Mapping[str, Any]) -> dict[str, Any]:
-    """Project one catalog config onto the OpenAI models entry shape."""
+    """Project one catalog config onto the OpenAI models entry shape.
+
+    Two different window numbers come from the upstream catalog and they are
+    NOT interchangeable: ``context_window_tokens.dev`` is the marketing/tier
+    number the product UI shows, while ``prompt_max_tokens`` (per model
+    detail) is the real prompt budget the gateway enforces.  Expose both and
+    let the console label them honestly.
+    """
     name = str(config.get("config_name") or "")
     display = config.get("display_config") or {}
     window = config.get("context_window_tokens") or {}
     if isinstance(window, Mapping):
-        context = int(window.get("dev") or window.get("default") or 0)
+        advertised = int(window.get("dev") or window.get("default") or 0)
     else:
-        context = 0
+        advertised = 0
+    prompt_max = 0
+    max_output = 0
+    for detail in config.get("model_detail_list") or []:
+        if not isinstance(detail, Mapping):
+            continue
+        prompt_max = max(prompt_max, int(detail.get("prompt_max_tokens") or 0))
+        max_output = max(max_output, int(detail.get("max_tokens") or 0))
     try:
         contact = json.loads(config.get("display_contact_config") or "{}")
     except (TypeError, ValueError):
@@ -339,7 +353,12 @@ def catalog_model_entry(config: Mapping[str, Any]) -> dict[str, Any]:
         "object": "model",
         "owned_by": "trae",
         "display_name": display.get("display_name") or name,
-        "context_window": context,
+        # OpenAI clients read context_window; report the enforced prompt budget
+        # when known, falling back to the advertised tier number.
+        "context_window": prompt_max or advertised,
+        "context_window_advertised": advertised,
+        "prompt_max_tokens": prompt_max,
+        "max_output_tokens": max_output,
         "capability": display.get("model_capability") or "",
         "multimodal": bool(display.get("multimodal")),
         "is_new": bool(display.get("is_new")),

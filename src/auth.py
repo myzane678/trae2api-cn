@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -239,6 +239,12 @@ def init_auth() -> AuthState:
     return state
 
 
+def _region_value(value: Any, default: str = "CN") -> str:
+    """Normalize a region code to upper case (upstream expects CN/US)."""
+    text = str(value or "").strip()
+    return text.upper() if text else default
+
+
 def _load_web_provider_specific(state: AuthState) -> None:
     """从环境变量加载网页版身份字段"""
     psd = {
@@ -247,8 +253,8 @@ def _load_web_provider_specific(state: AuthState) -> None:
         "userUniqueId": os.environ.get("TRAE_USER_UNIQUE_ID", "") or _safe_read_env_value("TRAE_USER_UNIQUE_ID"),
         "scope": os.environ.get("TRAE_WEB_SCOPE", "marscode-cn") or _safe_read_env_value("TRAE_WEB_SCOPE") or "marscode-cn",
         "tenant": os.environ.get("TRAE_WEB_TENANT", "marscode") or _safe_read_env_value("TRAE_WEB_TENANT") or "marscode",
-        "region": os.environ.get("TRAE_WEB_REGION", "CN") or _safe_read_env_value("TRAE_WEB_REGION") or "CN",
-        "aiRegion": os.environ.get("TRAE_WEB_AI_REGION", "CN") or _safe_read_env_value("TRAE_WEB_AI_REGION") or "CN",
+        "region": _region_value(os.environ.get("TRAE_WEB_REGION") or _safe_read_env_value("TRAE_WEB_REGION")),
+        "aiRegion": _region_value(os.environ.get("TRAE_WEB_AI_REGION") or _safe_read_env_value("TRAE_WEB_AI_REGION")),
         "appLanguage": os.environ.get("TRAE_WEB_APP_LANGUAGE", "zh-CN") or _safe_read_env_value("TRAE_WEB_APP_LANGUAGE") or "zh-CN",
         "appVersion": os.environ.get("TRAE_WEB_APP_VERSION", "1.0.0.1229") or _safe_read_env_value("TRAE_WEB_APP_VERSION") or "1.0.0.1229",
         "userRegion": os.environ.get("TRAE_WEB_USER_REGION", "CN") or _safe_read_env_value("TRAE_WEB_USER_REGION") or "CN",
