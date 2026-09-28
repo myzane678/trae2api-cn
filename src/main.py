@@ -329,7 +329,7 @@ PUBLIC_PATHS = {
     "/api/model-test",
     "/api/stop",
 }
-PUBLIC_PATH_PREFIXES = ("/api/checkin", "/api/accounts")
+PUBLIC_PATH_PREFIXES = ("/api/checkin", "/api/accounts", "/web/assets/")
 WEB_LOGIN_SCRIPT = Path(__file__).resolve().parent.parent / "web_login.py"
 
 
@@ -4599,6 +4599,27 @@ async def web_login_download(as_param: str = Query("", alias="as")):
         WEB_LOGIN_SCRIPT,
         media_type="text/plain; charset=utf-8",
         filename="web_login.py",
+    )
+
+
+# Static app assets for the console (favicon and the like). A fixed allowlist
+# instead of a directory mount: nothing outside this list is ever served.
+_ASSETS_DIR = Path(__file__).resolve().parent / "web" / "assets"
+_ASSET_TYPES = {
+    ".ico": "image/x-icon",
+    ".png": "image/png",
+}
+
+@app.get("/web/assets/{name}")
+async def web_asset(name: str):
+    safe = Path(name).name  # block traversal; files live flat in assets/
+    path = _ASSETS_DIR / safe
+    if path.suffix.lower() not in _ASSET_TYPES or not path.is_file():
+        return JSONResponse({"error": "asset not found"}, status_code=404)
+    return FileResponse(
+        path,
+        media_type=_ASSET_TYPES[path.suffix.lower()],
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 
