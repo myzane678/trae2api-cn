@@ -314,13 +314,20 @@ async def fetch_model_catalog(
             name = str(config.get("config_name") or "").strip()
             if not name or config.get("config_switch") is False:
                 continue
-            # Internal pipeline slots are not chat models; everything else is
-            # kept, including the custom_model_* entries that carry the large
-            # context variants (custom_model_1M / custom_model_deepseek_v4 are
-            # the 1M-window options and were previously filtered out by prefix).
+            # Only real, callable chat models belong in the catalog. Dropped:
+            #   - internal pipeline slots (summary, *_agent, *_subagent)
+            #   - custom_model_* aliases: entitlement-gated placeholders that
+            #     advertise large windows but answer 4023 when called directly
+            #   - codename slots that carry no display name at all
+            # NOTE: is_invisible_to_user is NOT a filter - the upstream sets it
+            # on ordinary models too (glm-5, DeepSeek-V4-Pro, ...).
             if name == "summary" or name.endswith(("_agent", "_subagent", "_sub_agent_v2")):
                 continue
-            if name == "custom_model_placeholder":
+            if name.startswith("custom_model_"):
+                continue
+            display = config.get("display_config") or {}
+            label = str(display.get("display_name") or "").strip("- ").strip()
+            if not label:
                 continue
             seen.setdefault(name, dict(config))
     return list(seen.values())
@@ -364,12 +371,7 @@ def catalog_model_entry(config: Mapping[str, Any]) -> dict[str, Any]:
         "object": "model",
         "owned_by": "trae",
         "display_name": label,
-        "custom": name.startswith("custom_model_"),
-        # Internal alias slots (custom_model_*) advertise the large windows but
-        # reject direct calls with business code 4023 on consumer accounts -
-        # they are entitlement-gated.  Flag them so the console can say so
-        # instead of presenting them as usable.
-        "alias_only": name.startswith("custom_model_"),
+
         # OpenAI clients read context_window; report the enforced prompt budget
         # when known, falling back to the advertised tier number.
         "context_window": prompt_max or advertised,

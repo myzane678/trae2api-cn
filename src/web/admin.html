@@ -818,7 +818,6 @@ async function refreshModels() {
       credit_rate: m.credit_rate,
       is_new: !!m.is_new,
       multimodal: !!m.multimodal,
-      alias_only: !!m.alias_only,
     }));
     fillModelOptions();
     renderModelRows();
@@ -832,7 +831,7 @@ function renderModelRows() {
   if (!body) return;
   body.innerHTML = state.models.map((m) => `
       <tr>
-        <td class="mono">${escapeHtml(m.id)}${m.is_new ? ' <span class="tag new">NEW</span>' : ''}${m.alias_only ? ' <span class="tag cool" title="上游内部别名槽位，消费版账号直接调用会返回 4023">别名</span>' : ''}</td>
+        <td class="mono">${escapeHtml(m.id)}${m.is_new ? ' <span class="tag new">NEW</span>' : ''}</td>
         <td>${escapeHtml(m.display_name)}</td>
         <td class="mono">${m.advertised ? (m.advertised / 1000).toFixed(0) + 'K' : '—'}</td>
         <td class="mono">${m.prompt_max ? (m.prompt_max / 1000).toFixed(0) + 'K' : '—'}</td>
