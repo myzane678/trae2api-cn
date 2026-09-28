@@ -31,7 +31,7 @@ body{min-height:100vh;background:var(--bg)}
 .side{position:fixed;top:0;left:0;bottom:0;width:var(--sidew);z-index:30;display:flex;flex-direction:column;
   background:var(--card);border-right:1px solid var(--line)}
 .sbrand{display:flex;align-items:center;gap:10px;padding:18px 16px 15px}
-.sbrand .logo{width:34px;height:34px;border-radius:9px;background:var(--acc);color:#fff;display:flex;
+.sbrand .logo{width:32px;height:32px;border-radius:9px;background:var(--acc);color:#fff;display:flex;
   align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none}
 .sbrand .t{min-width:0}
 .sbrand .t b{display:block;font-size:15px;font-weight:700;letter-spacing:.2px;line-height:1.35}
@@ -44,13 +44,13 @@ body{min-height:100vh;background:var(--bg)}
 .navitem{display:flex;align-items:center;gap:10px;padding:8.5px 12px;border-radius:9px;color:#4b5563;
   font-size:13.5px;font-weight:500;line-height:1.4;white-space:nowrap;text-decoration:none;cursor:pointer;
   transition:background .12s ease,color .12s ease;border:0;background:none;font-family:inherit;width:100%;text-align:left}
+.navitem svg{width:16px;height:16px;flex:none;opacity:.8}
 .navitem:hover{background:var(--soft);color:var(--txt)}
 .navitem.active{background:#eef2ff;color:#4338ca;font-weight:600}
+.navitem.active svg{opacity:1;color:var(--acc)}
 .navitem.red{color:var(--err)}
 .navitem.red:hover{background:#fef2f2;color:#b91c1c}
-.sfoot{padding:10px 12px 14px;border-top:1px solid var(--soft2);display:flex;flex-direction:column;gap:8px}
-.sfoot .kv{font-size:11px;color:var(--dim2);font-family:var(--mono);line-height:1.5}
-.sfoot .kv b{color:var(--dim);font-weight:600}
+.sfoot{padding:10px 12px 14px;border-top:1px solid var(--soft2);display:flex;flex-direction:column;gap:3px}
 
 /* ───── main ───── */
 .main{margin-left:var(--sidew);min-height:100vh}
@@ -67,6 +67,7 @@ body{min-height:100vh;background:var(--bg)}
   background:var(--card);border:1px solid var(--line2);color:#374151;border-radius:8px;
   padding:7px 14px;cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;
   transition:all .15s ease}
+.btn svg{width:13px;height:13px;flex:none;opacity:.8}
 .btn:hover{border-color:#b9c2d0;background:var(--soft);color:var(--txt);box-shadow:var(--shadow)}
 .btn:active{transform:translateY(1px)}
 .btn.primary{background:#18181b;border-color:#18181b;color:#fff}
@@ -79,39 +80,81 @@ body{min-height:100vh;background:var(--bg)}
 .btn.loading::after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;
   border:2px solid #cbd2dd;border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.mini{display:inline-flex;align-items:center;background:var(--card);border:1px solid var(--line2);color:#374151;
+  border-radius:6px;padding:2px 9px;cursor:pointer;font-size:11px;font-weight:500;margin-left:5px;
+  white-space:nowrap;transition:all .15s ease;font-family:inherit}
+.mini:hover{border-color:#b9c2d0;background:var(--soft)}
 input.kinput,select.kinput{background:var(--card);border:1px solid var(--line2);color:var(--txt);
   border-radius:8px;padding:7px 11px;font-size:13px;font-family:var(--mono)}
 input.kinput:focus,select.kinput:focus{outline:none;border-color:var(--acc);
   box-shadow:0 0 0 3px rgba(79,70,229,.12)}
-input.kinput[disabled]{background:var(--soft2);color:var(--dim2)}
+input.kinput[disabled],select.kinput[disabled]{background:var(--soft2);color:var(--dim2)}
 
 /* ───── stat cards ───── */
-.grid4{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:13px;margin-bottom:16px}
+.usage{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:18px}
 .ucard{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--line);
   border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow);transition:all .16s ease}
 .ucard:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
-.ucard .ic{width:42px;height:42px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;
-  background:#eef2ff;color:var(--acc);font-size:19px;font-weight:700}
-.ucard .ic.green{background:#ecfdf5;color:var(--ok)}
-.ucard .ic.amber{background:#fffbeb;color:var(--warn)}
-.ucard .ic.purple{background:#f5f3ff;color:#7c3aed}
+.ucard .ic{width:42px;height:42px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center}
+.ucard .ic svg{width:19px;height:19px}
+.ic-indigo{background:#eef2ff;color:#4f46e5}
+.ic-green{background:#ecfdf5;color:#059669}
+.ic-amber{background:#fffbeb;color:#d97706}
+.ic-blue{background:#eff6ff;color:#2563eb}
+.ic-purple{background:#f5f3ff;color:#7c3aed}
 .ucard .body{min-width:0}
 .ucard .k{color:var(--dim);font-size:12px;font-weight:500}
-.ucard .v{font-size:22px;font-weight:700;margin-top:1px;font-family:var(--mono);
-  font-variant-numeric:tabular-nums;line-height:1.3;letter-spacing:-.4px;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
+.ucard .v{font-size:23px;font-weight:700;margin-top:1px;font-family:var(--mono);
+  font-variant-numeric:tabular-nums;line-height:1.3;letter-spacing:-.4px}
 .ucard .s{color:var(--dim2);font-size:11px;font-family:var(--mono);margin-top:1px}
+.serr{color:var(--err)}
 
-/* ───── section cards ───── */
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-  padding:16px 18px 18px;min-width:0;box-shadow:var(--shadow);margin-bottom:16px}
+/* ───── cards ───── */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px 18px;
+  min-width:0;box-shadow:var(--shadow);margin-bottom:16px}
 .card h2{font-size:12px;font-weight:600;color:var(--dim);margin:0 0 13px;display:flex;align-items:center;gap:7px;
-  text-transform:uppercase;letter-spacing:.6px}
-.card h2 .hint{margin-left:auto;color:var(--dim2);font-size:11px;font-weight:400;letter-spacing:0;text-transform:none}
-.rowline{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-.explain{color:var(--dim2);font-size:11.5px;line-height:1.6;margin-top:4px}
+  letter-spacing:.5px;padding-bottom:9px;border-bottom:1px solid var(--soft2)}
+.card h2 svg{width:14px;height:14px;flex:none;color:var(--acc);opacity:.9}
+.card h2 .hint{margin-left:auto;color:var(--dim2);font-size:11px;font-weight:400;letter-spacing:0}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:900px){.charts{grid-template-columns:1fr}}
 
-/* ───── tags & badges ───── */
+/* ───── trend ───── */
+.trend{display:flex;align-items:stretch;gap:12px;height:200px;padding:8px 4px 0}
+.tcol{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:8px}
+.tbars{flex:1;width:100%;max-width:48px;display:flex;flex-direction:column-reverse;justify-content:flex-start;gap:3px}
+.tbar{width:100%;border-radius:4px;min-height:2px;transition:height .35s ease}
+.tbar.in{background:linear-gradient(180deg,#6366f1,#4f46e5)}
+.tbar.out{background:linear-gradient(180deg,#34d399,#10b981)}
+.tdate{font-size:11px;color:var(--dim2);font-family:var(--mono)}
+.tcol.today .tdate{color:var(--acc);font-weight:700}
+
+/* ───── donut ───── */
+.dist{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.donut{position:relative;width:152px;height:152px;border-radius:50%;flex:none}
+.dcenter{position:absolute;inset:27px;background:var(--card);border-radius:50%;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.dcenter b{font-size:19px;font-weight:700;font-family:var(--mono);line-height:1.1}
+.dcenter span{font-size:10.5px;color:var(--dim2)}
+.dleg{flex:1;min-width:190px;display:flex;flex-direction:column;gap:8px}
+.dlegrow{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.dsw{width:9px;height:9px;border-radius:3px;flex:none}
+.dname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
+.dmeta{color:var(--dim2);font-size:11px;font-family:var(--mono)}
+.dpct{font-family:var(--mono);font-weight:600;min-width:44px;text-align:right}
+
+/* ───── table ───── */
+.tablewrap{overflow:auto;max-height:620px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{position:sticky;top:0;background:var(--soft);color:var(--dim);font-weight:600;font-size:11px;
+  letter-spacing:.5px;text-transform:uppercase;padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);z-index:1}
+tbody td{padding:9px 12px;border-bottom:1px solid var(--soft2);vertical-align:middle;white-space:nowrap}
+tbody tr:hover{background:#fafbff}
+tbody tr:last-child td{border-bottom:0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.empty{color:var(--dim2);text-align:center;padding:32px 0;font-size:13px}
+
+/* ───── tags ───── */
 .tag{display:inline-block;padding:1.5px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
 .tag.ok{background:#ecfdf5;color:var(--ok)}
 .tag.cool{background:#fffbeb;color:var(--warn)}
@@ -123,74 +166,67 @@ input.kinput[disabled]{background:var(--soft2);color:var(--dim2)}
 .badge.ok{color:var(--ok);background:#ecfdf5}
 .badge.bad{color:var(--err);background:#fef2f2}
 
-/* ───── account cards ───── */
-.acctgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:13px}
-.acard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px 17px;
-  box-shadow:var(--shadow);transition:all .16s ease;display:flex;flex-direction:column;gap:10px}
-.acard:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
-.acard.active{border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,70,229,.12),var(--shadow-lg)}
-.acard .top{display:flex;align-items:center;gap:11px}
-.acard .avatar{width:40px;height:40px;border-radius:11px;flex:none;display:flex;align-items:center;
-  justify-content:center;font-weight:700;font-size:15px;color:#fff}
-.acard .who{min-width:0;flex:1}
-.acard .who b{display:block;font-size:14px;font-weight:650;line-height:1.4;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
-.acard .who span{color:var(--dim2);font-size:11px;font-family:var(--mono)}
-.acard .credits{display:flex;gap:8px;flex-wrap:wrap}
-.acard .mini-kv{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:5px 10px;min-width:96px}
-.acard .mini-kv .k{color:var(--dim2);font-size:10.5px;font-weight:500}
-.acard .mini-kv .v{font-family:var(--mono);font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
-.acard .acts{display:flex;gap:7px;flex-wrap:wrap}
-.acard .acts .btn{padding:5px 11px;font-size:12px}
+/* ───── accounts ───── */
+#accounts{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.acct{position:relative;display:flex;gap:12px;background:var(--soft);border:1px solid #eef1f5;border-radius:10px;
+  padding:13px 14px 12px 17px;transition:border-color .15s ease,background .15s ease}
+.acct::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0}
+.ac-ok::before{background:#10b981}
+.ac-cool::before{background:#f59e0b}
+.ac-bad::before{background:#f87171}
+.acct:hover{border-color:var(--line2);background:#f4f6fa}
+.acct.active{border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+.ahead{width:36px;height:36px;border-radius:9px;flex:none;margin-top:1px;display:flex;align-items:center;
+  justify-content:center;font-weight:700;font-size:14px}
+.ac-ok .ahead{background:#ecfdf5;color:var(--ok)}
+.ac-cool .ahead{background:#fffbeb;color:var(--warn)}
+.ac-bad .ahead{background:#fef2f2;color:var(--err)}
+.amain{flex:1;min-width:0}
+.arow{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.arow b{font-size:14.5px}
+.credit{margin-left:auto;color:var(--dim2);font-size:11.5px;font-family:var(--mono)}
+.credit b{color:var(--ok);font-size:16px;font-weight:700;margin-left:3px}
+.acct .uid{color:var(--dim2);font-size:11.5px;font-family:var(--mono);margin-top:1px}
+.astats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:9px;padding-top:8px;border-top:1px solid #eceff4}
+.astats span{padding-left:11px;border-left:1px solid #eceff4;display:flex;flex-direction:column;gap:1px}
+.astats span:first-child{padding-left:0;border-left:none}
+.astats i{color:var(--dim2);font-size:10.5px;font-style:normal}
+.astats b{font-family:var(--mono);font-size:13.5px}
+.aacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;padding-top:8px;border-top:1px solid #eceff4}
+.aacts .btn{padding:4px 10px;font-size:12px}
 
-/* ───── table ───── */
-.tablewrap{overflow:auto;max-height:680px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
-table{width:100%;border-collapse:collapse;font-size:12.5px}
-thead th{position:sticky;top:0;background:var(--soft);color:var(--dim);font-weight:600;font-size:11px;
-  letter-spacing:.5px;text-transform:uppercase;padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);z-index:1}
-tbody td{padding:9px 12px;border-bottom:1px solid var(--soft2);vertical-align:middle;white-space:nowrap}
-tbody tr:hover{background:#fafbff}
-tbody tr:last-child td{border-bottom:0}
-td.mono,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.empty{padding:34px 12px;text-align:center;color:var(--dim2);font-size:13px}
+/* ───── model list ───── */
+.mtools{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.mtools .cnt{color:var(--dim);font-size:12.5px;font-family:var(--mono)}
+#modelList{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.mrow{display:flex;align-items:center;gap:9px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;
+  background:var(--soft);cursor:pointer;transition:all .14s ease}
+.mrow:hover{border-color:var(--line2);background:#f4f6fa}
+.mrow.on{border-color:var(--acc);background:#eef2ff}
+.mrow input{width:15px;height:15px;accent-color:var(--acc);flex:none;cursor:pointer}
+.mrow .mname{font-family:var(--mono);font-size:12.5px;font-weight:600;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow .mmeta{color:var(--dim2);font-size:10.5px;font-family:var(--mono);text-align:right;line-height:1.4}
+.rghint{color:var(--dim2);font-size:11.5px;line-height:1.6}
+.rghint code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+  font-family:var(--mono);font-size:11.5px}
 
-/* ───── chips / key box ───── */
-.chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{display:inline-flex;align-items:center;gap:7px;background:var(--soft);border:1px solid var(--line2);
-  border-radius:8px;padding:5px 11px;font-family:var(--mono);font-size:12px}
-.chip .x{cursor:pointer;color:var(--dim2);font-weight:700;padding:0 2px}
-.chip .x:hover{color:var(--err)}
-.keybox{display:flex;align-items:center;gap:10px;background:var(--soft);border:1px solid var(--line);
-  border-radius:9px;padding:10px 14px;flex-wrap:wrap}
-.keybox .lbl{color:var(--dim);font-size:12px;font-weight:600;min-width:78px}
-.keybox code{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:5px 12px;
-  font-family:var(--mono);font-size:12.5px;word-break:break-all}
-
-/* ───── trend chart ───── */
-.trend{display:flex;align-items:flex-end;gap:10px;height:150px;padding:8px 4px 0}
-.trend .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
-.trend .bar{width:70%;max-width:46px;background:linear-gradient(180deg,#818cf8,#4f46e5);
-  border-radius:6px 6px 2px 2px;min-height:3px;transition:height .3s ease}
-.trend .bar.today{background:linear-gradient(180deg,#34d399,#059669)}
-.trend .num{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
-.trend .day{font-family:var(--mono);font-size:10.5px;color:var(--dim2)}
+/* ───── key bars ───── */
+.apikeybar{display:flex;align-items:center;gap:11px;flex-wrap:wrap;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--radius);padding:12px 18px;margin-bottom:16px;box-shadow:var(--shadow)}
+.kb-badge{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13.5px}
+.apikeybar code{background:var(--soft);border:1px solid var(--line);padding:5px 12px;border-radius:7px;
+  font-size:12.5px;font-family:var(--mono);max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kb-note{margin-left:auto;color:var(--dim2);font-size:12px}
 
 /* ───── toast ───── */
-.toast{position:fixed;top:18px;right:18px;z-index:80;min-width:250px;max-width:380px;
-  background:var(--card);border:1px solid var(--line);border-left:4px solid var(--ok);
-  border-radius:10px;padding:12px 16px;box-shadow:var(--shadow-lg);
-  opacity:0;transform:translateY(-10px);transition:all .22s ease;pointer-events:none}
-.toast.visible{opacity:1;transform:none}
-.toast.error{border-left-color:var(--err)}
-.toast b{display:block;font-size:13px;margin-bottom:2px}
-.toast span{color:var(--dim);font-size:12.5px;word-break:break-all}
-.msg{font-size:12px;min-height:18px;margin-top:6px}
-.msg-ok{color:var(--ok)}
-.msg-err{color:var(--err)}
-.note{color:var(--dim2);font-size:12px}
-.note code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:var(--mono);font-size:11.5px}
-hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
-.conn-detail{max-width:380px;word-break:break-all;font-family:var(--mono);font-size:11px;color:var(--dim)}
+#msg{position:fixed;right:22px;bottom:22px;background:#fff;border:1px solid var(--line);color:var(--txt);
+  padding:10px 18px;border-radius:10px;display:none;z-index:99;font-size:13px;
+  box-shadow:0 10px 32px rgba(16,24,40,.16);animation:toastIn .28s cubic-bezier(.21,1.02,.73,1)}
+#msg::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--acc);
+  margin-right:8px;vertical-align:1px}
+#msg.err::before{background:var(--err)}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
@@ -200,978 +236,714 @@ hr.sep{border:0;border-top:1px solid var(--soft2);margin:16px 0}
     <div class="logo">T</div>
     <div class="t">
       <b>Trae2API</b>
-      <div class="sstatus"><span class="dot" id="side-dot"></span><span id="side-status">连接中…</span></div>
+      <span class="sstatus"><span class="dot" id="healthDot"></span><span id="sideStatusTxt">检测中…</span></span>
     </div>
   </div>
   <nav class="snav">
-    <button class="navitem active" data-view="overview">概览</button>
-    <button class="navitem" data-view="accounts">账号</button>
-    <button class="navitem" data-view="models">模型白名单</button>
-    <button class="navitem" data-view="usage">消费记录</button>
-    <button class="navitem" data-view="conn">连接测试</button>
-    <button class="navitem" data-view="settings">设置</button>
+    <a class="navitem active" data-v="overview" href="#/overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.8"/><rect x="13.5" y="12.5" width="7.5" height="8.5" rx="1.8"/><rect x="3" y="16.5" width="7.5" height="4.5" rx="1.8"/></svg>
+      运行概览</a>
+    <a class="navitem" data-v="accounts" href="#/accounts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="3.5"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/><path d="M15.5 3.6a3.5 3.5 0 0 1 0 6.8"/></svg>
+      账号池</a>
+    <a class="navitem" data-v="models" href="#/models">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.3-2.9 7.3-7 9-4.1-1.7-7-4.7-7-9V6z"/><path d="M9.3 12l2 2 3.6-3.8"/></svg>
+      模型白名单</a>
+    <a class="navitem" data-v="logs" href="#/logs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg>
+      请求日志</a>
+    <a class="navitem" data-v="settings" href="#/settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a1.7 1.7 0 0 0-1.6-1H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 3 8.6a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 7 4.6h.1A1.7 1.7 0 0 0 8.6 3V3a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      设置</a>
+    <a class="navitem" data-v="conn" href="#/conn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.3"/></svg>
+      连接测试</a>
   </nav>
   <div class="sfoot">
-    <button class="navitem" id="side-restart">重启服务</button>
-    <button class="navitem red" id="side-stop">停止服务</button>
+    <button class="navitem" onclick="loadAll(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>
+      刷新数据</button>
+    <button class="navitem red" onclick="doRestart(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
+      重启服务</button>
+    <button class="navitem red" onclick="doStop(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
+      停止服务</button>
   </div>
 </aside>
 
 <main class="main">
 <div class="wrap">
 
-  <!-- ============ overview ============ -->
   <section class="view on" id="view-overview">
     <div class="pagehead">
-      <h1>概览</h1>
-      <div class="desc">Trae CN SOLO 通道 · OpenAI 兼容</div>
-      <div class="acts"><button class="btn" id="ov-refresh">刷新数据</button></div>
+      <h1>运行概览</h1>
+      <span class="desc" id="uptime">–</span>
+      <span class="acts">
+        <button class="btn primary" id="btnCheckin" onclick="doCheckin(this)">立即签到</button>
+      </span>
     </div>
-    <div class="grid4">
-      <div class="ucard"><div class="ic purple">✦</div><div class="body">
-        <div class="k">可用积分</div><div class="v" id="ov-credits">—</div>
-        <div class="s">全部为通用积分</div></div></div>
-      <div class="ucard"><div class="ic">Σ</div><div class="body">
-        <div class="k">总 Token</div><div class="v" id="ov-tokens">—</div>
-        <div class="s">本机全部请求累计</div></div></div>
-      <div class="ucard"><div class="ic green">◷</div><div class="body">
-        <div class="k">今日 Token</div><div class="v" id="ov-today-tokens">—</div>
-        <div class="s">北京时间 0 点起</div></div></div>
-      <div class="ucard"><div class="ic amber">✦</div><div class="body">
-        <div class="k">今日消耗积分</div><div class="v" id="ov-today-credits">—</div>
-        <div class="s" id="ov-today-credits-sub">按模型费率估算</div></div></div>
-      <div class="ucard"><div class="ic amber">◉</div><div class="body">
-        <div class="k">账号</div><div class="v" id="ov-accounts">—</div>
-        <div class="s" id="ov-accounts-sub">—</div></div></div>
+    <div class="usage" id="usage"><div class="empty" style="width:100%">加载中…</div></div>
+    <div class="charts">
+      <div class="card">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M6 20V10"/><path d="M11 20V4"/><path d="M16 20v-7"/></svg>Token 使用趋势
+          <span class="hint">最近 7 天 · 下段输入 / 上段输出</span>
+        </h2>
+        <div class="trend" id="trend"><div class="empty" style="width:100%">加载中…</div></div>
+      </div>
+      <div class="card">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg>模型分布
+          <span class="hint">今日</span>
+        </h2>
+        <div class="dist" id="dist"><div class="empty" style="width:100%">加载中…</div></div>
+      </div>
     </div>
     <div class="card">
-      <h2>7 日消耗趋势 <span class="hint">每天 Token 用量（北京时间）</span></h2>
-      <div class="trend" id="trend"><div class="empty" style="width:100%">加载中…</div></div>
-    </div>
-    <div class="card">
-      <h2>接入信息</h2>
-      <div class="keybox" style="margin-bottom:9px">
-        <span class="lbl">接口地址</span>
-        <code id="acc-url">http://127.0.0.1:8092/v1</code>
-        <button class="btn" data-copy="http://127.0.0.1:8092/v1">复制</button>
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="16.5" r="3.5"/><path d="M10 14 20 4m-3.5.5 3 3"/></svg>接入信息</h2>
+      <div class="apikeybar" style="margin:0 0 10px">
+        <span class="kb-badge">接口地址</span>
+        <code>http://127.0.0.1:8092/v1</code>
+        <button class="btn" onclick="copyText('http://127.0.0.1:8092/v1')">复制</button>
+        <span class="kb-note">客户端 Base URL</span>
       </div>
-      <div class="keybox">
-        <span class="lbl">API Key</span>
-        <code id="acc-key">{{API_KEY_MASKED}}</code>
-        <button class="btn" id="acc-key-copy">复制</button>
+      <div class="apikeybar" style="margin:0">
+        <span class="kb-badge">API Key</span>
+        <code id="accKey">…</code>
+        <button class="btn" onclick="copyText(FULL_API_KEY)">复制</button>
+        <span class="kb-note">Bearer Token · 配置在 .env 的 RELAY_API_KEYS</span>
       </div>
-      <div class="explain">客户端把 Base URL 设为上面的接口地址、API Key 填入即可；Key 在本机 .env 的 RELAY_API_KEYS 配置，界面上只显示掩码。</div>
     </div>
   </section>
 
-  <!-- ============ accounts ============ -->
   <section class="view" id="view-accounts">
     <div class="pagehead">
-      <h1>账号</h1>
-      <div class="desc">凭据仅存本机 data/accounts.json</div>
-      <div class="acts">
-        <button class="btn" id="acct-refresh">刷新积分</button>
-        <button class="btn" id="acct-checkin">全部签到</button>
-      </div>
+      <h1>账号池</h1>
+      <span class="desc" id="acctHint"></span>
+      <span class="acts">
+        <button class="btn" onclick="refreshCredits(this)">刷新积分</button>
+        <button class="btn primary" onclick="startAuth()">授权登录</button>
+      </span>
     </div>
     <div class="card">
-      <h2>授权登录</h2>
-      <div class="rowline">
-        <button class="btn primary" id="auth-btn">使用 Trae 网页授权登录</button>
-        <a class="btn" id="bat-link" style="display:none" href="/web/login/download?as=bat">下载一键启动 start_auth.bat</a>
-      </div>
-      <div class="msg" id="auth-msg"></div>
-      <div class="explain">授权回调固定为 <code>http://127.0.0.1:{{LISTENER_PORT}}/authorize</code>，需本机助手在线（双击 start_auth.bat）。</div>
+      <div id="accounts"><div class="empty">加载中…</div></div>
     </div>
     <div class="card">
-      <h2>手动添加凭证 <span class="hint">已有 token 时直接粘贴</span></h2>
-      <div class="rowline" style="margin-bottom:9px">
-        <input class="kinput" id="manual-token" placeholder="token（必填）" style="min-width:320px">
-        <input class="kinput" id="manual-refresh" placeholder="refresh_token（可选）" style="min-width:200px">
-        <input class="kinput" id="manual-user-id" placeholder="user_id（可选）" style="width:160px">
-      </div>
-      <div class="rowline">
-        <input class="kinput" id="manual-host" placeholder="host（可选，默认官方）" style="min-width:240px">
-        <input class="kinput" id="manual-label" placeholder="标签（可选）" style="width:140px">
-        <button class="btn primary" id="manual-add">添加账号</button>
-      </div>
-      <div class="msg" id="manual-msg"></div>
-    </div>
-    <div class="acctgrid" id="acct-grid"><div class="empty">加载中…</div></div>
-    <div class="msg" id="account-msg"></div>
-    <div class="card">
-      <h2>签到记录 <span class="hint">最近 20 次（北京时间）</span></h2>
-      <div class="tablewrap" style="max-height:300px">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>签到记录 <span class="hint">最近 20 次（北京时间）</span></h2>
+      <div class="tablewrap" style="max-height:280px">
         <table>
           <thead><tr><th>时间</th><th>账号</th><th>积分</th></tr></thead>
-          <tbody id="checkin-history-body"><tr><td colspan="3" class="empty">加载中…</td></tr></tbody>
+          <tbody id="checkinBody"><tr><td colspan="3" class="empty">加载中…</td></tr></tbody>
         </table>
       </div>
     </div>
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>手动添加凭证 <span class="hint">已有 token 时直接粘贴</span></h2>
+      <div class="arow" style="margin-bottom:9px">
+        <input class="kinput" id="manualToken" placeholder="token（必填）" style="min-width:300px">
+        <input class="kinput" id="manualRefresh" placeholder="refresh_token（可选）" style="min-width:190px">
+        <input class="kinput" id="manualUserId" placeholder="user_id（可选）" style="width:150px">
+      </div>
+      <div class="arow">
+        <input class="kinput" id="manualHost" placeholder="host（可选，默认官方）" style="min-width:230px">
+        <input class="kinput" id="manualLabel" placeholder="标签（可选）" style="width:130px">
+        <button class="btn primary" onclick="addManualAccount(this)">添加账号</button>
+      </div>
+    </div>
   </section>
 
-  <!-- ============ models ============ -->
   <section class="view" id="view-models">
     <div class="pagehead">
       <h1>模型白名单</h1>
-      <div class="desc">只有勾选的模型会暴露给 /v1</div>
-      <div class="acts"><button class="btn" id="models-refresh">刷新模型列表</button></div>
+      <span class="desc">不勾 = 放行全部</span>
+      <span class="acts">
+        <button class="btn" onclick="refreshCatalog(this)">刷新模型列表</button>
+        <button class="btn primary" onclick="saveAllowlist(this)">保存白名单</button>
+      </span>
     </div>
     <div class="card">
-      <h2>白名单 <span class="hint" id="allow-count"></span></h2>
-      <div class="chips" id="allow-chips"><span class="note">加载中…</span></div>
-      <hr class="sep">
-      <div class="rowline">
-        <select class="kinput" id="allow-select" style="min-width:280px"><option>加载中…</option></select>
-        <button class="btn primary" id="allow-add">添加到白名单</button>
-        <button class="btn" id="allow-save">保存白名单</button>
+      <div class="mtools">
+        <span class="cnt" id="mcount"></span>
+        <button class="mini" onclick="setAllModels(true)">全选</button>
+        <button class="mini" onclick="setAllModels(false)">清空（放行全部）</button>
       </div>
-      <div class="msg" id="allow-msg"></div>
-    </div>
-    <div class="card">
-      <h2>模型目录 <span class="hint">窗口 / 费率来自上游 get_detail_param</span></h2>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>模型 ID</th><th>显示名</th><th>标称窗口</th><th>实际可用</th><th>最大输出</th><th>能力</th><th>积分费率</th><th></th></tr></thead>
-          <tbody id="models-body"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
-        </table>
+      <div id="modelList"><span class="empty">加载中…</span></div>
+      <div class="rghint" style="margin-top:13px">
+        勾选后 /v1/models 与对话请求都只放行所选（其余 403），保存后即时生效；一个都不勾 = 放行全部模型。
+        列表来自上游 <code>get_detail_param</code>，显示网关实际允许的提示预算与积分费率。
       </div>
     </div>
   </section>
 
-  <!-- ============ usage ============ -->
-  <section class="view" id="view-usage">
+  <section class="view" id="view-logs">
     <div class="pagehead">
-      <h1>消费记录</h1>
-      <div class="desc">按请求计 · 北京时间 · 积分带 ≈ 为估算值</div>
-      <div class="acts"><button class="btn primary" id="usage-refresh">刷新</button></div>
+      <h1>请求日志</h1>
+      <span class="desc">按请求计 · 北京时间 · 积分带 ≈ 为按费率估算</span>
+      <span class="acts"><button class="btn" onclick="loadUsage(this)">刷新</button></span>
     </div>
     <div class="card">
-      <h2>明细</h2>
       <div class="tablewrap">
         <table>
           <thead><tr><th>时间</th><th>模型</th><th>端点</th><th>状态</th><th>输入</th><th>输出</th><th>积分</th><th>首字</th><th>总耗时</th></tr></thead>
-          <tbody id="usage-body"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
-        </table>
-      </div>
-      <div class="msg" id="usage-msg"></div>
-    </div>
-  </section>
-
-  <!-- ============ connectivity ============ -->
-  <section class="view" id="view-conn">
-    <div class="pagehead">
-      <h1>连接测试</h1>
-      <div class="desc">走真实 dispatch 路径 · 工具测试用小额度</div>
-    </div>
-    <div class="card">
-      <h2>测试参数</h2>
-      <div class="rowline" style="margin-bottom:10px">
-        <label class="note">模型</label>
-        <select class="kinput" id="conn-model" style="min-width:240px"><option>加载中…</option></select>
-        <label class="note">超时(秒)</label>
-        <input class="kinput" id="conn-timeout" value="120" style="width:80px">
-      </div>
-      <div class="rowline">
-        <label class="note"><input type="checkbox" id="conn-mode-text" checked> 文本回复</label>
-        <label class="note"><input type="checkbox" id="conn-mode-tool" checked> 工具调用</label>
-        <button class="btn primary" id="conn-run-btn">开始测试</button>
-      </div>
-      <div class="msg" id="conn-msg"></div>
-    </div>
-    <div class="card">
-      <h2>结果 <span class="hint" id="conn-summary"></span></h2>
-      <div class="tablewrap">
-        <table id="conn-table" style="display:none">
-          <thead><tr><th>模型</th><th>模式</th><th>状态</th><th>耗时</th><th>详情</th></tr></thead>
-          <tbody id="conn-tbody"></tbody>
+          <tbody id="logBody"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
         </table>
       </div>
     </div>
   </section>
 
-  <!-- ============ settings ============ -->
   <section class="view" id="view-settings">
     <div class="pagehead">
       <h1>设置</h1>
-      <div class="desc">轮询 · 签到 · 上游</div>
+      <span class="desc">多账号轮询 · 签到错峰 · 上游网关</span>
+      <span class="acts"><button class="btn primary" onclick="saveSettings(this)">保存设置</button></span>
     </div>
     <div class="card">
-      <h2>多账号轮询</h2>
-      <div class="rowline" style="margin-bottom:6px">
-        <label class="note"><input type="checkbox" id="poll-toggle"> 启用多账号轮询</label>
-        <label class="note"><input type="radio" name="poll-mode" value="round-robin"> 顺序轮换</label>
-        <label class="note"><input type="radio" name="poll-mode" value="credit-priority"> 优先低消耗</label>
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>多账号轮询 <span class="hint" id="pollGateHint"></span></h2>
+      <div class="arow" style="margin-bottom:8px">
+        <label class="rghint"><input type="checkbox" id="pollEnabled"> 启用多账号轮询</label>
+        <label class="rghint"><input type="radio" name="pollMode" value="round-robin"> 顺序轮换</label>
+        <label class="rghint"><input type="radio" name="pollMode" value="credit-priority"> 优先低消耗</label>
       </div>
-      <div class="explain">多账号时每次请求自动切换账号分摊用量。<b>顺序轮换</b>＝按账号列表轮着用；
-        <b>优先低消耗</b>＝优先用剩余积分最多的账号。只有 1 个账号时此项无效（按钮置灰）。</div>
+      <div class="rghint">多账号时每次请求自动切换账号分摊用量。<b>顺序轮换</b>＝按账号列表轮着用；<b>优先低消耗</b>＝优先用剩余积分最多的账号。只有 1 个账号时本项无效。</div>
     </div>
     <div class="card">
-      <h2>签到与上游</h2>
-      <div class="rowline">
-        <label class="note">签到间隔(秒)</label>
-        <input class="kinput" id="set-checkin-interval" value="{{CHECKIN_INTERVAL}}" style="width:90px">
-        <label class="note">自定义上游(可选)</label>
-        <input class="kinput" id="set-base-url" placeholder="留空用默认网关" style="min-width:240px">
-        <button class="btn primary" id="settings-save">保存设置</button>
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>签到与上游</h2>
+      <div class="arow">
+        <label class="rghint">签到间隔(秒)</label>
+        <input class="kinput" id="setCheckinInterval" value="{{CHECKIN_INTERVAL}}" style="width:90px">
+        <label class="rghint">自定义上游(可选)</label>
+        <input class="kinput" id="setBaseUrl" placeholder="留空用默认网关" style="min-width:240px">
       </div>
-      <div class="explain"><b>签到间隔</b>＝一键签到时相邻两个账号之间的等待秒数（错峰防风控）；
-        <b>自定义上游</b>＝覆盖 Trae API 网关地址，日常请留空用默认值。</div>
-      <div class="msg" id="settings-msg"></div>
-      <hr class="sep">
-      <div class="explain">账号安全：每账号并发上限 2；失败回合不会自动重放（防重复扣分）；
-        模型表有 TTL 缓存，不会逐请求打上游；积分列为按模型费率的估算值（带 ≈）。</div>
+      <div class="rghint" style="margin-top:8px"><b>签到间隔</b>＝一键签到时相邻两个账号之间的等待秒数（错峰防风控）；<b>自定义上游</b>＝覆盖 Trae API 网关地址，日常请留空用默认值。</div>
+    </div>
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.3-2.9 7.3-7 9-4.1-1.7-7-4.7-7-9V6z"/></svg>账号安全</h2>
+      <div class="rghint">每账号并发上限 2；失败回合不会自动重放（防重复扣分）；模型表有 TTL 缓存，不会逐请求打上游；
+        请求头版本与设备字段恒定不逐请求变化；积分列为按模型费率的估算值（带 ≈）。</div>
+    </div>
+  </section>
+
+  <section class="view" id="view-conn">
+    <div class="pagehead">
+      <h1>连接测试</h1>
+      <span class="desc">走真实 dispatch 路径 · 用小额度验证</span>
+    </div>
+    <div class="card">
+      <div class="arow" style="margin-bottom:10px">
+        <label class="rghint">模型</label>
+        <select class="kinput" id="connModel" style="min-width:230px"><option>加载中…</option></select>
+        <label class="rghint">超时(秒)</label>
+        <input class="kinput" id="connTimeout" value="120" style="width:80px">
+        <label class="rghint"><input type="checkbox" id="connText" checked> 文本回复</label>
+        <label class="rghint"><input type="checkbox" id="connTool" checked> 工具调用</label>
+        <button class="btn primary" onclick="runConnTest(this)">开始测试</button>
+      </div>
+      <div class="tablewrap" style="max-height:340px">
+        <table id="connTable" style="display:none">
+          <thead><tr><th>模型</th><th>模式</th><th>状态</th><th>耗时</th><th>详情</th></tr></thead>
+          <tbody id="connBody"></tbody>
+        </table>
+      </div>
+      <div class="rghint" id="connMsg" style="margin-top:8px"></div>
     </div>
   </section>
 
 </div>
 </main>
 
-<div class="toast" id="toast"><b id="toast-title"></b><span id="toast-text"></span></div>
+<div id="msg"></div>
 
 <script>
 'use strict';
-const $ = (id) => document.getElementById(id);
 const FULL_API_KEY = "{{API_KEY_FULL}}";
-const state = { traceId: '', win: null, models: [], allowlist: [], activeAccount: '', accounts: [] };
+const $ = (id) => document.getElementById(id);
+let statsData = null, lastOverview = null, allModels = [], allowlist = [];
 
-/* ───── feedback ───── */
-let toastTimer = null;
-function showToast(title, text, ok, timeout) {
-  const toast = $('toast');
-  $('toast-title').textContent = title || '';
-  $('toast-text').textContent = text || '';
-  toast.className = 'toast visible ' + (ok ? 'ok' : 'error');
-  clearTimeout(toastTimer);
-  const delay = timeout === undefined ? (ok ? 3000 : 9000) : timeout;
-  if (delay > 0) toastTimer = setTimeout(() => { toast.className = 'toast'; }, delay);
-}
-function showMsg(id, text, ok, timeout) {
-  const el = $(id);
-  if (!el) return;
-  if (!text) { el.textContent = ''; el.className = 'msg'; return; }
-  el.textContent = text;
-  el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
-  showToast(ok ? '成功' : '操作失败', text, ok, timeout === undefined ? (ok ? 3000 : 9000) : timeout);
-}
-function escapeHtml(v) {
+function esc(v) {
   return String(v === undefined || v === null ? '' : v)
-    .replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+    .replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
-function setBusy(btn, busy) {
-  if (!btn) return;
-  btn.disabled = !!busy;
-  btn.classList.toggle('loading', !!busy);
+function toast(text, ok) {
+  const el = $('msg');
+  el.textContent = text || '';
+  el.className = ok === false ? 'err' : '';
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.display = 'none'; }, ok === false ? 8000 : 3000);
 }
-
-/* ───── formatters ───── */
-function fmtTime(ts) {
-  if (!ts) return '—';
-  const d = new Date(ts * 1000);
-  const p = (n) => String(n).padStart(2, '0');
-  const now = new Date();
-  const hm = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
-  return (d.toDateString() === now.toDateString() ? '' : (p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ')) + hm;
-}
-function fmtTokens(n) {
-  if (n === undefined || n === null) return '—';
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + ' M';
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + ' k';
-  return String(n);
-}
-function fmtDur(ms) {
-  if (ms === undefined || ms === null) return '—';
-  return (ms / 1000).toFixed(2) + ' s';
-}
-function fmtCredits(c) {
-  if (c === undefined || c === null) return '—';
-  return '≈' + Number(c).toFixed(2);
-}
-
-/* ───── fetch helpers ───── */
-async function requestJSON(url, init, timeoutMs) {
+async function api(url, init, timeoutMs) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 45000);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 30000);
   try {
     const r = await fetch(url, Object.assign({ cache: 'no-store' }, init || {}, { signal: ctrl.signal }));
+    const text = await r.text();
     let data = null;
-    try { data = await r.json(); } catch (e) { data = null; }
-    return { ok: r.ok, status: r.status, data: data };
-  } catch (e) {
-    return { ok: false, status: 0, data: { error: String(e) } };
+    try { data = JSON.parse(text); } catch (e) { data = null; }
+    if (!r.ok) throw new Error((data && (data.error || data.message)) || ('HTTP ' + r.status));
+    return data;
   } finally { clearTimeout(timer); }
 }
-async function postJSON(url, payload, timeoutMs) {
-  const result = await requestJSON(url, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload || {})
-  }, timeoutMs || 45000);
-  let d = result.data;
-  if (!d || typeof d !== 'object' || Array.isArray(d)) d = {};
-  d._http_status = result.status; d._http_ok = result.ok;
-  return d;
+async function post(url, payload, timeoutMs) {
+  return api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}) }, timeoutMs);
 }
-function apiError(data, status) {
-  if (!data) return 'HTTP ' + (status || '?');
-  const body = data.data || data;
-  const code = body && body.code !== undefined && body.code !== null ? String(body.code) : '';
-  return (body && (body.error || body.message)) || ('HTTP ' + (status || '?') + (code ? ' code ' + code : ''));
+function busy(btn, on) { if (btn) { btn.disabled = !!on; btn.classList.toggle('loading', !!on); } }
+function fmtTok(n) {
+  n = Number(n || 0);
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+  return String(n);
+}
+function fmtYi(n) { n = Number(n || 0); return n >= 1e8 ? (n / 1e8).toFixed(2) + ' 亿' : n >= 1e4 ? (n / 1e4).toFixed(1) + ' 万' : String(n); }
+function n2(x) { return Number(x || 0).toFixed(2); }
+function fmtTime(ts) {
+  if (!ts) return '–';
+  const d = new Date(ts * 1000), now = new Date(), p = (n) => String(n).padStart(2, '0');
+  const hm = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  return d.toDateString() === now.toDateString() ? hm : (p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + hm);
+}
+function fmtDur(ms) { return ms === undefined || ms === null ? '–' : (ms / 1000).toFixed(2) + 's'; }
+
+function showView(name) {
+  document.querySelectorAll('.navitem[data-v]').forEach((n) => n.classList.toggle('active', n.getAttribute('data-v') === name));
+  document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === 'view-' + name));
+}
+window.addEventListener('hashchange', () => showView((location.hash || '#/overview').slice(2) || 'overview'));
+
+/* ── overview: cards + trend + donut ── */
+const UI = [
+  ['ic-indigo', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/></svg>'],
+  ['ic-blue', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M8 16V9M12 16v-4M16 16V7"/></svg>'],
+  ['ic-green', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>'],
+  ['ic-amber', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.1L21 11l-5.3 4 1.6 6.5L12 18l-5.3 3.5L8.3 15 3 11l6.6-1.9z"/></svg>'],
+  ['ic-purple', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg>'],
+  ['ic-indigo', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>'],
+];
+function card(i, k, v, s) {
+  const ic = UI[i] || ['', ''];
+  return `<div class="ucard"><div class="ic ${ic[0]}">${ic[1]}</div><div class="body"><div class="k">${k}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div></div>`;
+}
+const PALETTE = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b'];
+
+async function loadStats() {
+  try { statsData = await api('/api/stats'); renderOverview(); } catch (e) { /* keep previous */ }
+}
+function renderOverview() {
+  if (!statsData) return;
+  const t = statsData.today, tot = statsData.total;
+  const tTok = (t.in_tok || 0) + (t.out_tok || 0);
+  const totTok = (tot.in_tok || 0) + (tot.out_tok || 0);
+  const credit = lastOverview && lastOverview.credits;
+  $('usage').innerHTML = [
+    card(2, '今日 Tokens', fmtTok(tTok), `输入 ${fmtTok(t.in_tok)} / 输出 ${fmtTok(t.out_tok)}`),
+    card(1, '累计 Tokens', fmtTok(totTok), totTok ? `${fmtYi(totTok)} · 自 ${(tot.since || '').slice(5)} 起` : '–'),
+    card(4, '今日请求', t.requests, t.errors ? `<span class="serr">失败 ${t.errors}</span>` : '全部成功'),
+    card(3, '今日消耗积分', '≈' + n2(t.credit), `累计 ≈${n2(tot.credit)}`),
+    card(0, '可用积分', credit !== undefined && credit !== null ? Number(credit).toFixed(0) : '–', '当前账号通用积分'),
+    card(5, '平均首字', t.ttfb_avg_ms > 0 ? (t.ttfb_avg_ms / 1000).toFixed(1) + 's' : '–',
+      t.ttfb_n > 0 ? `今日 ${t.ttfb_n} 次流式` : '今日暂无流式'),
+  ].join('');
+  renderTrend();
+  renderDist();
+}
+function renderTrend() {
+  const el = $('trend');
+  const days = (statsData && statsData.days) || [];
+  if (!days.length) { el.innerHTML = '<div class="empty" style="width:100%">暂无数据 · 统计自本次启动后开始累积</div>'; return; }
+  const max = Math.max(...days.map((d) => (d.in_tok || 0) + (d.out_tok || 0)), 1);
+  const today = statsData.today.date;
+  el.innerHTML = days.map((d) => {
+    const hIn = (d.in_tok || 0) / max * 100, hOut = (d.out_tok || 0) / max * 100;
+    return `<div class="tcol${d.date === today ? ' today' : ''}"
+      title="${d.date} · 请求 ${d.requests}${d.errors ? `（失败 ${d.errors}）` : ''} · 输入 ${d.in_tok} · 输出 ${d.out_tok} tok · ≈${n2(d.credit)} 积分">
+      <div class="tbars"><div class="tbar in" style="height:${hIn.toFixed(1)}%"></div><div class="tbar out" style="height:${hOut.toFixed(1)}%"></div></div>
+      <div class="tdate">${d.date === today ? '今日' : d.date.slice(5)}</div>
+    </div>`;
+  }).join('');
+}
+function renderDist() {
+  const el = $('dist');
+  const list = (statsData && statsData.today && statsData.today.models) || [];
+  if (!list.length) { el.innerHTML = '<div class="empty" style="width:100%">今日暂无请求</div>'; return; }
+  const totalTok = list.reduce((s, m) => s + (m.in_tok || 0) + (m.out_tok || 0), 0) || 1;
+  const totalReq = list.reduce((s, m) => s + (m.requests || 0), 0);
+  let acc = 0; const segs = [];
+  const rows = list.slice(0, 10).map((m, i) => {
+    const tok = (m.in_tok || 0) + (m.out_tok || 0);
+    const from = acc / totalTok * 100; acc += tok; const to = acc / totalTok * 100;
+    segs.push(`${PALETTE[i % PALETTE.length]} ${from.toFixed(2)}% ${to.toFixed(2)}%`);
+    return `<div class="dlegrow">
+      <span class="dsw" style="background:${PALETTE[i % PALETTE.length]}"></span>
+      <span class="dname" title="${esc(m.model)}">${esc(m.model)}</span>
+      <span class="dmeta">${m.requests} 次 · ${fmtTok(tok)} tok</span>
+      <span class="dpct">${(tok / totalTok * 100).toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="donut" style="background:conic-gradient(${segs.join(',')})">
+      <div class="dcenter"><b>${totalReq}</b><span>今日请求</span></div>
+    </div><div class="dleg">${rows}</div>`;
 }
 
-/* ───── navigation ───── */
-document.querySelectorAll('.navitem[data-view]').forEach((el) => {
-  el.addEventListener('click', () => {
-    document.querySelectorAll('.navitem[data-view]').forEach((n) => n.classList.remove('active'));
-    el.classList.add('active');
-    document.querySelectorAll('.view').forEach((v) => v.classList.remove('on'));
-    const view = $('view-' + el.getAttribute('data-view'));
-    if (view) view.classList.add('on');
-  });
-});
-function goto(view) {
-  const nav = document.querySelector('.navitem[data-view="' + view + '"]');
-  if (nav) nav.click();
+/* ── accounts ── */
+async function loadAccounts() {
+  let d;
+  try { d = await api('/api/checkin/accounts'); } catch (e) { $('accounts').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const accts = d.accounts || [];
+  const active = accts.find((a) => a.id === d.active) || accts[0];
+  lastOverview = Object.assign({}, lastOverview, { credits: null });
+  if (active) {
+    const gen = (active.credits && active.credits.account_credits) || active.account_credits;
+    if (gen && !gen.unlimited) lastOverview.credits = gen.remaining;
+  }
+  $('acctHint').textContent = accts.length + ' 个账号 · 当前 ' + ((active && (active.label || active.user_id)) || '–');
+  if (statsData) renderOverview();
+  $('accounts').innerHTML = accts.length ? accts.map((a) => {
+    const isActive = a.id === d.active;
+    const gen = (a.credits && a.credits.account_credits) || a.account_credits || {};
+    const total = (a.credits && a.credits.total_credits) || a.total_credits || {};
+    const checked = a.checked_in || (a.checkin && a.checkin.checked_in);
+    const rem = gen.unlimited ? '∞' : (gen.remaining !== undefined && gen.remaining !== null ? Number(gen.remaining).toFixed(0) : '–');
+    const tot = total.unlimited ? '∞' : (total.remaining !== undefined && total.remaining !== null ? Number(total.remaining).toFixed(0) : '–');
+    const ini = esc((a.label || a.user_id || '?').trim().charAt(0).toUpperCase() || '?');
+    const sc = a.is_valid === false ? 'bad' : checked ? 'ok' : 'cool';
+    const st = a.is_valid === false ? '<span class="tag bad">失效</span>'
+      : checked ? '<span class="tag ok">已签到</span>' : '<span class="tag cool">未签到</span>';
+    return `<div class="acct ac-${sc}${isActive ? ' active' : ''}">
+      <div class="ahead">${ini}</div>
+      <div class="amain">
+        <div class="arow"><b>${esc(a.label || a.user_id || a.id)}</b>${isActive ? '<span class="tag info">当前</span>' : ''}${st}
+          <span class="credit">积分<b>${rem}</b></span></div>
+        <div class="uid">${esc(a.user_id || a.id)}</div>
+        <div class="astats">
+          <span><i>通用积分</i><b>${rem}</b></span>
+          <span><i>总积分</i><b>${tot}</b></span>
+          <span><i>有效期</i><b>${esc((a.expires || '').slice(5, 10) || '–')}</b></span>
+        </div>
+        <div class="aacts">
+          <button class="btn${checked ? ' done' : ' primary'}" onclick="checkinOne('${esc(a.id)}',this)"${checked ? ' disabled' : ''}>${checked ? '今日已签' : '签到'}</button>
+          <button class="btn" onclick="switchAccount('${esc(a.id)}',this)"${isActive ? ' disabled' : ''}>切换</button>
+          <button class="btn danger" onclick="removeAccount('${esc(a.id)}')">删除</button>
+        </div>
+      </div></div>`;
+  }).join('') : '<div class="empty">无账号，点右上角「授权登录」添加</div>';
+  applyPollGate(accts.length);
+  const allDone = accts.length > 0 && accts.every((a) => a.checked_in || (a.checkin && a.checkin.checked_in));
+  const b = $('btnCheckin');
+  if (b) { b.disabled = allDone; b.classList.toggle('done', allDone); b.textContent = allDone ? '今日已全部签到' : '立即签到'; }
 }
-
-/* ───── auth (PKCE-ish web login) ───── */
-function uuid() {
-  return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
-    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+async function checkinOne(id, btn) {
+  busy(btn, true);
+  try {
+    const d = await post('/api/checkin/claim', { account_id: id }, 40000);
+    if (d.success) toast(d.skipped ? '今日已签过到' : ('签到成功' + (d.claimed_credits != null ? '，本次 +' + d.claimed_credits : '')), true);
+    else toast(d.error || '签到失败', false);
+  } catch (e) { toast(String(e.message || e), false); }
+  finally { busy(btn, false); loadAccounts(); loadCheckinHistory(); loadStats(); }
 }
-function randomHex(n) {
-  const bytes = crypto.getRandomValues(new Uint8Array(n / 2));
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+async function doCheckin(btn) {
+  busy(btn, true);
+  try { await post('/api/checkin/claim-all', {}, 90000); toast('批量签到完成，明细见签到记录', true); }
+  catch (e) { toast(String(e.message || e), false); }
+  finally { busy(btn, false); loadAccounts(); loadCheckinHistory(); loadStats(); }
 }
-function randomDigits(n) {
-  let s = '';
-  const bytes = crypto.getRandomValues(new Uint8Array(n));
-  for (let i = 0; i < n; i++) s += String(bytes[i] % 10);
-  return s;
+async function switchAccount(id, btn) {
+  busy(btn, true);
+  try { await post('/api/accounts/switch', { account_id: id }); toast('已切换账号', true); }
+  catch (e) { toast(String(e.message || e), false); }
+  finally { busy(btn, false); loadAccounts(); loadStats(); }
 }
-function buildAuthUrl() {
+async function removeAccount(id) {
+  if (!confirm('确定删除该账号？凭证将从本机移除。')) return;
+  try { await post('/api/accounts/remove', { account_id: id }); toast('已删除', true); }
+  catch (e) { toast(String(e.message || e), false); }
+  loadAccounts();
+}
+async function refreshCredits(btn) {
+  busy(btn, true);
+  try { await api('/api/checkin/credits/accounts', null, 40000); toast('积分已刷新', true); }
+  catch (e) { toast(String(e.message || e), false); }
+  finally { busy(btn, false); loadAccounts(); loadStats(); }
+}
+async function loadCheckinHistory() {
+  let d;
+  try { d = await api('/api/checkin/history'); } catch (e) { return; }
+  const rows = (d && d.records) || [];
+  $('checkinBody').innerHTML = rows.length
+    ? rows.slice(0, 20).map((r) => `<tr><td class="mono">${fmtTime(r.timestamp)}</td><td>${esc(r.label || r.account_id || '–')}</td><td class="mono">${r.credits != null ? '+' + esc(String(r.credits)) : '–'}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty">还没有签到记录</td></tr>';
+}
+async function addManualAccount(btn) {
+  const token = $('manualToken').value.trim();
+  if (!token) { toast('token 必填', false); return; }
+  busy(btn, true);
+  try {
+    await post('/api/web-auth', {
+      token: token, refresh_token: $('manualRefresh').value.trim(),
+      user_id: $('manualUserId').value.trim(), host: $('manualHost').value.trim(),
+      label: $('manualLabel').value.trim(),
+    });
+    toast('账号已添加', true);
+    ['manualToken', 'manualRefresh', 'manualUserId', 'manualHost', 'manualLabel'].forEach((id) => { $(id).value = ''; });
+    loadAccounts();
+  } catch (e) { toast(String(e.message || e), false); }
+  finally { busy(btn, false); }
+}
+function uuid() { return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)); }
+function randomHex(n) { return Array.from(crypto.getRandomValues(new Uint8Array(n / 2)), (b) => b.toString(16).padStart(2, '0')).join(''); }
+function randomDigits(n) { let s = ''; const b = crypto.getRandomValues(new Uint8Array(n)); for (let i = 0; i < n; i++) s += String(b[i] % 10); return s; }
+function buildAuthUrl(traceId) {
   const cb = 'http://127.0.0.1:{{LISTENER_PORT}}/authorize';
   const mid = randomHex(32), did = randomDigits(19);
   const p = new URLSearchParams({
     login_version: '1', auth_from: 'solo', login_channel: 'native_ide', plugin_version: '2.3.24254',
-    auth_type: 'local', client_id: '{{CLIENT_ID}}', redirect: '0', login_trace_id: state.traceId,
+    auth_type: 'local', client_id: '{{CLIENT_ID}}', redirect: '0', login_trace_id: traceId,
     auth_callback_url: cb, machine_id: mid, device_id: did, x_device_id: did, x_machine_id: mid,
     x_device_brand: 'ASUS TUF Gaming A15 FA507RM_FA507RM', x_device_type: 'windows',
-    x_os_version: 'Windows 10 Pro', x_env: '',
-    x_app_version: '3.3.65', x_app_type: 'stable', hide_saas_login: 'true',
+    x_os_version: 'Windows 10 Pro', x_env: '', x_app_version: '3.3.65', x_app_type: 'stable', hide_saas_login: 'true',
   });
   return '{{AUTH_URL}}?' + p.toString();
 }
-async function checkLocalListener() {
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 1200);
-    const r = await fetch('http://127.0.0.1:{{LISTENER_PORT}}/healthz', { signal: ctrl.signal, cache: 'no-store' });
-    clearTimeout(timer);
-    return r.ok;
-  } catch (e) { return false; }
-}
 async function startAuth() {
-  const btn = $('auth-btn');
   try {
-    const ok = await checkLocalListener();
-    if (!ok) {
-      showMsg('auth-msg', '未检测到本机授权助手，请先双击运行 start_auth.bat：', false);
-      $('bat-link').style.display = 'inline-flex';
-      return;
-    }
-    state.traceId = uuid();
-    const w = window.open(buildAuthUrl(), 'trae-relay-oauth', 'width=560,height=760');
-    if (!w) { showMsg('auth-msg', '浏览器已拦截弹窗，请允许后重试', false); return; }
-    state.win = w;
-    setBusy(btn, true);
-    showMsg('auth-msg', '请在弹出的 Trae 授权页完成登录…', true);
-    const poll = setInterval(() => {
-      if (w.closed) {
-        clearInterval(poll);
-        setBusy(btn, false);
-        showMsg('auth-msg', '');
-        loadAccounts();
-        loadCheckinHistory();
-      }
-    }, 700);
+    const r = await fetch('http://127.0.0.1:{{LISTENER_PORT}}/healthz', { cache: 'no-store' });
+    if (!r.ok) throw new Error('down');
   } catch (e) {
-    showMsg('auth-msg', String(e), false);
-    setBusy(btn, false);
+    toast('未检测到本机授权助手，请先运行 start_auth.bat（或在项目目录跑 web_login.py）', false);
+    return;
   }
+  const w = window.open(buildAuthUrl(uuid()), 'trae-relay-oauth', 'width=560,height=760');
+  if (!w) { toast('浏览器拦截了弹窗，请允许后重试', false); return; }
+  toast('请在弹出的 Trae 授权页完成登录…', true);
+  const poll = setInterval(() => {
+    if (w.closed) { clearInterval(poll); loadAccounts(); loadCheckinHistory(); }
+  }, 700);
 }
 
-/* ───── accounts ───── */
-const AVATAR_COLORS = ['#4f46e5', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777'];
-function avatarColor(id) {
-  let h = 0;
-  for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-function fmtCreditsRaw(c) {
-  if (!c) return '—';
-  if (c.unlimited) return '不限';
-  const rem = c.remaining !== undefined && c.remaining !== null ? c.remaining : c.total_limit;
-  return Number(rem).toFixed(0);
-}
-async function loadAccounts() {
-  const result = await requestJSON('/api/checkin/accounts', { method: 'GET' }, 12000);
-  const grid = $('acct-grid');
-  const d = result.data;
-  if (!result.ok || !d || !d.success) {
-    grid.innerHTML = '<div class="empty">账号列表加载失败：' + escapeHtml(apiError(d, result.status)) + '</div>';
-    return;
-  }
-  const accounts = d.accounts || [];
-  state.accounts = accounts;
-  state.activeAccount = d.active || state.activeAccount;
-  $('ov-accounts').textContent = String(accounts.length);
-  $('ov-accounts-sub').textContent = accounts.length
-    ? '当前：' + ((accounts.find((a) => a.id === state.activeAccount) || {}).label || state.activeAccount || '—')
-    : '还没有账号，先授权登录';
-  // overview credits = active account's general credits
-  const active = accounts.find((a) => a.id === state.activeAccount) || accounts[0];
-  const gen = active && ((active.credits && active.credits.account_credits) || active.account_credits);
-  $('ov-credits').textContent = fmtCreditsRaw(gen);
-  applyPollingGate();
-  // "check in all" only makes sense while some account still needs it
-  const allDone = accounts.length > 0 && accounts.every((a) => a.checked_in || (a.checkin && a.checkin.checked_in));
-  ['acct-checkin', 'ov-checkin'].forEach((bid) => {
-    const b = $(bid);
-    if (!b) return;
-    if (allDone) { b.classList.add('done'); b.disabled = true; b.textContent = '今日已全部签到'; }
-    else { b.classList.remove('done'); b.disabled = false; b.textContent = '全部签到'; }
-  });
-  if (!accounts.length) {
-    grid.innerHTML = '<div class="empty">还没有账号，点上方「使用 Trae 网页授权登录」添加</div>';
-    return;
-  }
-  grid.innerHTML = accounts.map((a) => {
-    const isActive = a.id === state.activeAccount;
-    const general = (a.credits && a.credits.account_credits) || a.account_credits || null;
-    const total = (a.credits && a.credits.total_credits) || a.total_credits || null;
-    const checked = a.checked_in || (a.checkin && a.checkin.checked_in);
-    return `
-      <div class="acard${isActive ? ' active' : ''}" data-account-id="${escapeHtml(a.id)}">
-        <div class="top">
-          <div class="avatar" style="background:${avatarColor(a.id)}">${escapeHtml((a.label || a.user_id || '?').slice(0, 1).toUpperCase())}</div>
-          <div class="who">
-            <b>${escapeHtml(a.label || a.user_id || a.id)}${isActive ? ' <span class="tag ok">当前</span>' : ''}</b>
-            <span>${escapeHtml(a.user_id || a.id)}</span>
-          </div>
-        </div>
-        <div class="credits">
-          <div class="mini-kv"><div class="k">通用积分</div><div class="v">${fmtCreditsRaw(general)}</div></div>
-          <div class="mini-kv"><div class="k">总积分</div><div class="v">${fmtCreditsRaw(total)}</div></div>
-          <div class="mini-kv"><div class="k">签到</div><div class="v">${checked ? '<span class="tag ok">已签</span>' : '<span class="tag cool">未签</span>'}</div></div>
-        </div>
-        <div class="acts">
-          <button class="btn${checked ? ' done' : ' primary'}" data-action="checkin" data-id="${escapeHtml(a.id)}">${checked ? '今日已签到' : '签到'}</button>
-          <button class="btn" data-action="switch" data-id="${escapeHtml(a.id)}"${isActive ? ' disabled' : ''}>切换</button>
-          <button class="btn danger" data-action="remove" data-id="${escapeHtml(a.id)}">删除</button>
-        </div>
-      </div>`;
+/* ── models / allowlist ── */
+function inList(id) { const k = String(id || '').toLowerCase(); return allowlist.some((m) => String(m).toLowerCase() === k); }
+function renderModels() {
+  const el = $('modelList');
+  if (!allModels.length) { el.innerHTML = '<span class="empty">暂无可用模型，点「刷新模型列表」</span>'; updateMcount(); return; }
+  el.innerHTML = allModels.map((m) => {
+    const on = inList(m.id);
+    const win = m.prompt_max_tokens ? Math.round(m.prompt_max_tokens / 1000) + 'K' : (m.context_window ? Math.round(m.context_window / 1000) + 'K' : '–');
+    const adv = m.context_window_advertised ? Math.round(m.context_window_advertised / 1000) + 'K' : '';
+    const meta = [win + (adv && adv !== win ? `（标称 ${adv}）` : ''), m.credit_rate != null ? m.credit_rate + 'x' : ''].filter(Boolean).join(' · ');
+    return `<label class="mrow${on ? ' on' : ''}">
+      <input type="checkbox" data-mid="${esc(m.id)}"${on ? ' checked' : ''} onchange="toggleModel(this)">
+      <span class="mname" title="${esc(m.id)}">${esc(m.id)}${m.is_new ? ' <span class="tag new">NEW</span>' : ''}</span>
+      <span class="mmeta">${esc(meta)}</span>
+    </label>`;
   }).join('');
+  updateMcount();
+  fillConnModels();
 }
-async function checkinAccount(id) {
-  const btn = document.querySelector('[data-action="checkin"][data-id="' + CSS.escape(id) + '"]');
-  setBusy(btn, true);
-  try {
-    const d = await postJSON('/api/checkin/claim', { account_id: id }, 30000);
-    if (d.success) {
-      const gained = d.claimed_credits !== undefined && d.claimed_credits !== null ? '，本次 +' + d.claimed_credits : '';
-      showMsg('account-msg', (d.skipped ? '今日已签过到' : '签到成功' + gained) + '，积分余额见账号卡', true);
-    } else {
-      showMsg('account-msg', d.error || '签到失败', false);
-    }
-  } finally {
-    setBusy(btn, false);
-    loadAccounts();
-    loadCheckinHistory();
-  }
+function toggleModel(box) {
+  const id = box.getAttribute('data-mid');
+  if (box.checked) { if (!inList(id)) allowlist.push(id); }
+  else { allowlist = allowlist.filter((m) => String(m).toLowerCase() !== id.toLowerCase()); }
+  box.closest('.mrow').classList.toggle('on', box.checked);
+  updateMcount();
 }
-async function checkinAll() {
-  const btn = $('acct-checkin') || $('ov-checkin');
-  setBusy(btn, true);
-  try {
-    const d = await postJSON('/api/checkin/claim-all', {}, 60000);
-    const ok = d && (d.ok !== false && d.success !== false);
-    showMsg('account-msg', ok ? '批量签到完成，明细见签到记录' : (d.error || '签到失败'), ok);
-  } finally {
-    setBusy(btn, false);
-    loadAccounts();
-    loadCheckinHistory();
-  }
+function setAllModels(on) {
+  allowlist = on ? allModels.map((m) => m.id) : [];
+  renderModels();
 }
-async function refreshCredits() {
-  const btn = $('acct-refresh');
-  setBusy(btn, true);
-  try {
-    const result = await requestJSON('/api/checkin/credits/accounts', { method: 'GET' }, 30000);
-    const d = result.data;
-    if (result.ok && d && d.success !== false) {
-      showMsg('account-msg', '积分已刷新', true);
-    } else {
-      showMsg('account-msg', apiError(d, result.status), false);
-    }
-  } finally {
-    setBusy(btn, false);
-    loadAccounts();
-  }
-}
-async function switchAccount(id) {
-  const btn = document.querySelector('[data-action="switch"][data-id="' + CSS.escape(id) + '"]');
-  setBusy(btn, true);
-  try {
-    const d = await postJSON('/api/accounts/switch', { account_id: id }, 30000);
-    if (!d.success) { showMsg('account-msg', d.error || '切换失败', false); return; }
-    state.activeAccount = d.active || id;
-    showMsg('account-msg', '已切换到 ' + ((d.account && (d.account.label || d.account.user_id)) || id), true);
-  } finally {
-    setBusy(btn, false);
-    loadAccounts();
-  }
-}
-async function removeAccount(id) {
-  if (!confirm('确定删除该账号？凭证将从本机移除。')) return;
-  const d = await postJSON('/api/accounts/remove', { account_id: id });
-  if (d.success) { showMsg('account-msg', '已删除', true); loadAccounts(); }
-  else showMsg('account-msg', d.error || '删除失败', false);
-}
-document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-action]');
+function updateMcount() {
+  const el = $('mcount');
   if (!el) return;
-  const id = el.getAttribute('data-id');
-  const action = el.getAttribute('data-action');
-  if (action === 'checkin') checkinAccount(id);
-  else if (action === 'switch') switchAccount(id);
-  else if (action === 'remove') removeAccount(id);
-});
-async function loadCheckinHistory() {
-  const result = await requestJSON('/api/checkin/history', { method: 'GET' }, 10000);
-  const d = result.data;
-  const body = $('checkin-history-body');
-  if (!body) return;
-  const rows = (d && d.records) || [];
-  if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="3" class="empty">还没有签到记录——签到成功后会记在这里</td></tr>';
-    return;
-  }
-  body.innerHTML = rows.slice(0, 20).map((r) => `
-    <tr>
-      <td class="mono">${fmtTime(r.timestamp)}</td>
-      <td>${escapeHtml(r.label || r.account_id || '—')}</td>
-      <td class="mono">${r.credits !== undefined && r.credits !== null ? '+' + escapeHtml(String(r.credits)) : '—'}</td>
-    </tr>`).join('');
+  el.textContent = allModels.length
+    ? `已选 ${allowlist.length} / 共 ${allModels.length} 个模型` + (allowlist.length ? '' : '（放行全部）')
+    : '暂无可用模型';
 }
-
-/* ───── allowlist & models ───── */
 async function loadAllowlist() {
-  const result = await requestJSON('/api/allowlist', { method: 'GET' }, 12000);
-  const d = result.data;
-  const chips = $('allow-chips');
-  if (!result.ok || !d) { chips.innerHTML = '<span class="note">白名单加载失败</span>'; return; }
-  const list = d.allowed || d.models || [];
-  state.allowlist = Array.isArray(list) ? list.map((m) => (typeof m === 'string' ? m : m.id || m.name)).filter(Boolean) : [];
-  renderAllowlist();
-}
-function inAllowlist(id) {
-  const key = String(id || '').toLowerCase();
-  return state.allowlist.some((m) => String(m).toLowerCase() === key);
-}
-function renderAllowlist() {
-  const chips = $('allow-chips');
-  $('allow-count').textContent = state.allowlist.length ? state.allowlist.length + ' 个模型' : '未启用白名单（全部暴露）';
-  if (!state.allowlist.length) {
-    chips.innerHTML = '<span class="note">白名单为空 = 全部模型可用。添加模型后只有勾选的会暴露给 /v1。</span>';
-    return;
-  }
-  chips.innerHTML = state.allowlist.map((m) =>
-    `<span class="chip">${escapeHtml(m)}<span class="x" data-remove-model="${escapeHtml(m)}">×</span></span>`).join('');
-  chips.querySelectorAll('[data-remove-model]').forEach((el) => {
-    el.addEventListener('click', () => {
-      state.allowlist = state.allowlist.filter((m) => m !== el.getAttribute('data-remove-model'));
-      renderAllowlist();
-    });
-  });
-}
-function fillModelOptions() {
-  const options = state.models.map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.id)}${m.display_name && m.display_name !== m.id ? ' · ' + escapeHtml(m.display_name) : ''}</option>`).join('');
-  const allowSel = $('allow-select');
-  const connSel = $('conn-model');
-  if (allowSel) allowSel.innerHTML = options || '<option>先点「刷新模型列表」</option>';
-  if (connSel) connSel.innerHTML = options || '<option>先点「刷新模型列表」</option>';
-}
-async function refreshModels() {
-  const btn = $('models-refresh');
-  setBusy(btn, true);
   try {
-    // all=1 returns the full catalog: the allowlist must not hide models from
-    // the picker, or the list can never be grown back.
-    const result = await requestJSON('/v1/models?refresh=1&all=1', { method: 'GET' }, 30000);
-    const d = result.data;
-    if (!result.ok || !d || !Array.isArray(d.data)) {
-      showMsg('allow-msg', apiError(d, result.status), false);
-      return;
-    }
-    state.models = d.data.map((m) => ({
-      id: m.id,
-      display_name: m.display_name || m.id,
-      context_window: m.context_window || 0,
-      advertised: m.context_window_advertised || 0,
-      prompt_max: m.prompt_max_tokens || 0,
-      max_output: m.max_output_tokens || 0,
-      capability: m.capability || '',
-      credit_rate: m.credit_rate,
-      is_new: !!m.is_new,
-      multimodal: !!m.multimodal,
-    }));
-    fillModelOptions();
-    renderModelRows();
-    showMsg('allow-msg', '模型列表已刷新：' + state.models.length + ' 个', true);
-  } finally {
-    setBusy(btn, false);
-  }
+    const d = await api('/api/allowlist');
+    allowlist = (d.allowed || []).slice();
+    if (!allModels.length) await refreshCatalog(null, true);
+    else renderModels();
+  } catch (e) { /* keep */ }
 }
-function renderModelRows() {
-  const body = $('models-body');
-  if (!body) return;
-  body.innerHTML = state.models.map((m) => `
-      <tr>
-        <td class="mono">${escapeHtml(m.id)}${m.is_new ? ' <span class="tag new">NEW</span>' : ''}</td>
-        <td>${escapeHtml(m.display_name)}</td>
-        <td class="mono">${m.advertised ? (m.advertised / 1000).toFixed(0) + 'K' : '—'}</td>
-        <td class="mono">${m.prompt_max ? (m.prompt_max / 1000).toFixed(0) + 'K' : '—'}</td>
-        <td class="mono">${m.max_output ? (m.max_output / 1000).toFixed(0) + 'K' : '—'}</td>
-        <td>${m.multimodal ? '<span class="tag info">多模态</span> ' : ''}${escapeHtml(m.capability || '—')}</td>
-        <td class="mono">${m.credit_rate !== undefined && m.credit_rate !== null ? escapeHtml(String(m.credit_rate)) : '—'}</td>
-        <td><button class="btn${inAllowlist(m.id) ? ' done' : ''}" data-quick-add="${escapeHtml(m.id)}"${inAllowlist(m.id) ? ' disabled' : ''}>${inAllowlist(m.id) ? '已加入' : '＋'}</button></td>
-      </tr>`).join('') || '<tr><td colspan="8" class="empty">无模型</td></tr>';
-  body.querySelectorAll('[data-quick-add]').forEach((el) => {
-    el.addEventListener('click', () => {
-      const id = el.getAttribute('data-quick-add');
-      if (inAllowlist(id)) return;
-      state.allowlist.push(id);
-      renderAllowlist();
-      renderModelRows();
-      showMsg('allow-msg', id + ' 已加入白名单（记得点「保存白名单」生效）', true);
-    });
-  });
-}
-async function saveAllowlist() {
-  const btn = $('allow-save');
-  setBusy(btn, true);
+async function refreshCatalog(btn, quiet) {
+  if (btn) busy(btn, true);
   try {
-    const d = await postJSON('/api/allowlist', { ids: state.allowlist }, 20000);
-    if (d.success === false) { showMsg('allow-msg', d.error || '保存失败', false); return; }
-    showMsg('allow-msg', '白名单已保存（' + (d.count !== undefined ? d.count + ' 个模型' : '生效') + '）', true);
-    loadAllowlist();
-  } finally {
-    setBusy(btn, false);
-  }
+    const d = await api('/v1/models?refresh=1&all=1', null, 40000);
+    allModels = (d && d.data) || [];
+    renderModels();
+    if (!quiet) toast('模型列表已刷新：' + allModels.length + ' 个', true);
+  } catch (e) { if (!quiet) toast(String(e.message || e), false); }
+  finally { if (btn) busy(btn, false); }
 }
-$('allow-add').addEventListener('click', () => {
-  const sel = $('allow-select');
-  const id = sel.value;
-  if (!id || id.startsWith('先点')) { showMsg('allow-msg', '先刷新模型列表', false); return; }
-  if (inAllowlist(id)) { showMsg('allow-msg', id + ' 已在白名单', true); return; }
-  state.allowlist.push(id);
-  renderAllowlist();
-  showMsg('allow-msg', id + ' 已加入（记得保存）', true);
-});
+async function saveAllowlist(btn) {
+  busy(btn, true);
+  try {
+    const d = await post('/api/allowlist', { ids: allowlist });
+    toast('白名单已保存' + (d.count !== undefined ? '（' + d.count + ' 个模型）' : ''), true);
+    await loadAllowlist();
+  } catch (e) { toast(String(e.message || e), false); }
+  finally { busy(btn, false); }
+}
+function fillConnModels() {
+  const sel = $('connModel');
+  if (!sel) return;
+  sel.innerHTML = allModels.length
+    ? allModels.map((m) => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join('')
+    : '<option>先刷新模型列表</option>';
+}
 
-/* ───── usage ───── */
-function usageRows(rows) {
-  return (rows || []).map((r) => {
-    const st = String(r.status || '').toLowerCase();
-    const ok = st === 'completed' || st === 'ok';
-    const statusHtml = ok
-      ? '<span class="badge ok">200 完成</span>'
-      : '<span class="badge bad">' + escapeHtml(r.status || '失败') + '</span>';
-    return `
-      <tr>
+/* ── logs ── */
+async function loadUsage(btn) {
+  if (btn) busy(btn, true);
+  try {
+    const d = await api('/api/usage/records');
+    const rows = Array.isArray(d) ? d : ((d && (d.records || d.data)) || []);
+    $('logBody').innerHTML = rows.length ? rows.map((r) => {
+      const st = String(r.status || '').toLowerCase();
+      const ok = st === 'completed' || st === 'ok' || st === '';
+      return `<tr>
         <td class="mono">${fmtTime(r.timestamp)}</td>
-        <td class="mono">${escapeHtml(r.model || '—')}</td>
-        <td class="mono">${escapeHtml((r.endpoint || '').replace('/v1/', '') || '—')}</td>
-        <td>${statusHtml}</td>
-        <td class="mono">${fmtTokens(r.prompt_tokens)}</td>
-        <td class="mono">${fmtTokens(r.completion_tokens)}</td>
-        <td class="mono">${fmtCredits(r.credits_consumed)}</td>
+        <td class="mono">${esc(r.model || '–')}</td>
+        <td class="mono">${esc((r.endpoint || '').replace('/v1/', '') || '–')}</td>
+        <td>${ok ? '<span class="badge ok">完成</span>' : '<span class="badge bad">' + esc(r.status) + '</span>'}</td>
+        <td class="mono">${fmtTok(r.prompt_tokens)}</td>
+        <td class="mono">${fmtTok(r.completion_tokens)}</td>
+        <td class="mono">${r.credits_consumed != null ? '≈' + n2(r.credits_consumed) : '–'}</td>
         <td class="mono">${fmtDur(r.ttfb_ms)}</td>
         <td class="mono">${fmtDur(r.duration_ms)}</td>
       </tr>`;
-  }).join('');
-}
-async function refreshUsage() {
-  const result = await requestJSON('/api/usage/records', { method: 'GET' }, 15000);
-  const d = result.data;
-  const rows = (d && (d.records || d.data)) || (Array.isArray(d) ? d : []);
-  const body = $('usage-body');
-  if (!result.ok) {
-    body.innerHTML = '<tr><td colspan="9" class="empty">加载失败：' + escapeHtml(apiError(d, result.status)) + '</td></tr>';
-    return;
-  }
-  body.innerHTML = rows.length
-    ? usageRows(rows)
-    : '<tr><td colspan="9" class="empty">暂无记录——发起一次 /v1/chat/completions 后再来看</td></tr>';
+    }).join('') : '<tr><td colspan="9" class="empty">暂无记录 · 发起一次 /v1/chat/completions 后再来看</td></tr>';
+  } catch (e) { $('logBody').innerHTML = `<tr><td colspan="9" class="empty">${esc(e.message)}</td></tr>`; }
+  finally { if (btn) busy(btn, false); }
 }
 
-/* ───── overview summary + trend ───── */
-async function loadSummary() {
-  const result = await requestJSON('/api/usage/summary', { method: 'GET' }, 12000);
-  const d = result.data;
-  if (!result.ok || !d || !d.success) return;
-  $('ov-tokens').textContent = fmtTokens(d.total_tokens);
-  $('ov-today-tokens').textContent = fmtTokens(d.today_tokens);
-  $('ov-today-credits').textContent = d.today_credits !== null && d.today_credits !== undefined ? '≈' + Number(d.today_credits).toFixed(2) : '—';
-  $('ov-today-credits-sub').textContent = d.credits_estimated ? '按模型费率估算' : '上游计费';
-  const trend = $('trend');
-  const days = d.trend || [];
-  if (!days.length) {
-    trend.innerHTML = '<div class="empty" style="width:100%">还没有用量数据</div>';
-    return;
-  }
-  const max = Math.max.apply(null, days.map((x) => x.tokens)) || 1;
-  trend.innerHTML = days.map((x, i) => {
-    const h = Math.max(3, Math.round(x.tokens / max * 108));
-    const label = x.tokens >= 1e6 ? (x.tokens / 1e6).toFixed(1) + 'M' : x.tokens >= 1e3 ? (x.tokens / 1e3).toFixed(0) + 'k' : x.tokens;
-    return `<div class="col">
-      <div class="num">${label}</div>
-      <div class="bar${i === days.length - 1 ? ' today' : ''}" style="height:${h}px"></div>
-      <div class="day">${i === days.length - 1 ? '今天' : escapeHtml(x.day)}</div>
-    </div>`;
-  }).join('');
-}
-
-/* ───── connectivity test ───── */
-function connModes() {
-  const modes = [];
-  if ($('conn-mode-text').checked) modes.push('text');
-  if ($('conn-mode-tool').checked) modes.push('tool');
-  return modes;
-}
+/* ── connection test ── */
 function connRow(model, mode) {
   const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td class="mono">${escapeHtml(model)}</td>
-    <td>${mode === 'tool' ? '工具调用' : '文本回复'}</td>
-    <td class="conn-status">排队中…</td>
-    <td class="conn-time mono">—</td>
-    <td class="conn-detail">—</td>`;
+  tr.innerHTML = `<td class="mono">${esc(model)}</td><td>${mode === 'tool' ? '工具调用' : '文本回复'}</td>
+    <td class="cs">排队中…</td><td class="ct mono">–</td><td class="cd">–</td>`;
   return tr;
 }
-async function runConnTest() {
-  const btn = $('conn-run-btn');
-  const table = $('conn-table');
-  const tbody = $('conn-tbody');
-  const summary = $('conn-summary');
-  const model = $('conn-model').value;
-  const modes = connModes();
-  if (!model || model.startsWith('先点')) { showMsg('conn-msg', '先到「模型白名单」刷新模型列表', false); return; }
-  if (!modes.length) { showMsg('conn-msg', '请至少勾选一种测试内容', false); return; }
-  const timeout = parseInt($('conn-timeout').value, 10) || 120;
-  setBusy(btn, true);
+async function runConnTest(btn) {
+  const model = $('connModel').value;
+  const modes = [];
+  if ($('connText').checked) modes.push('text');
+  if ($('connTool').checked) modes.push('tool');
+  if (!model || model.startsWith('先刷新')) { toast('先刷新模型列表', false); return; }
+  if (!modes.length) { toast('请至少勾选一种测试内容', false); return; }
+  const timeout = parseInt($('connTimeout').value, 10) || 120;
+  busy(btn, true);
+  const table = $('connTable'), body = $('connBody');
   table.style.display = 'table';
-  tbody.innerHTML = '';
-  showMsg('conn-msg', '');
-  const jobs = modes.map((mode) => {
-    const row = connRow(model, mode);
-    tbody.appendChild(row);
-    return { mode: mode, row: row };
-  });
-  let passed = 0, done = 0;
-  summary.textContent = '0/' + jobs.length + ' 完成';
+  body.innerHTML = '';
+  const jobs = modes.map((mode) => { const row = connRow(model, mode); body.appendChild(row); return { mode, row }; });
+  let passed = 0;
   for (const job of jobs) {
-    const statusCell = job.row.querySelector('.conn-status');
-    const timeCell = job.row.querySelector('.conn-time');
-    const detailCell = job.row.querySelector('.conn-detail');
-    statusCell.textContent = '测试中…';
+    const cs = job.row.querySelector('.cs'), ct = job.row.querySelector('.ct'), cd = job.row.querySelector('.cd');
+    cs.textContent = '测试中…';
     try {
-      const d = await postJSON('/api/model-test', { model: model, mode: job.mode, timeout: timeout }, (timeout + 20) * 1000);
-      timeCell.textContent = fmtDur(d.elapsed_ms);
-      const ok = d.success !== false && (d._http_ok || d.ok);
-      if (ok) {
-        passed++;
-        statusCell.innerHTML = '<span class="badge ok">通过</span>';
-        detailCell.textContent = d.detail || d.preview || d.message || (job.mode === 'tool' ? '工具调用返回正常' : '文本回复正常');
-      } else {
-        statusCell.innerHTML = '<span class="badge bad">失败</span>';
-        detailCell.textContent = d.error || apiError(d, d._http_status) || '未知错误';
-      }
-    } catch (e) {
-      statusCell.innerHTML = '<span class="badge bad">失败</span>';
-      detailCell.textContent = String(e);
-    }
-    done++;
-    summary.textContent = done + '/' + jobs.length + ' 完成 · 通过 ' + passed;
+      const d = await post('/api/model-test', { model, mode: job.mode, timeout }, (timeout + 20) * 1000);
+      ct.textContent = fmtDur(d.elapsed_ms);
+      const ok = d.success !== false && d.ok !== false;
+      if (ok) { passed++; cs.innerHTML = '<span class="badge ok">通过</span>'; cd.textContent = d.detail || d.preview || d.message || (job.mode === 'tool' ? '工具调用返回正常' : '文本回复正常'); }
+      else { cs.innerHTML = '<span class="badge bad">失败</span>'; cd.textContent = d.error || '未知错误'; }
+    } catch (e) { cs.innerHTML = '<span class="badge bad">失败</span>'; cd.textContent = String(e.message || e); }
   }
-  setBusy(btn, false);
-  showMsg('conn-msg', '测试结束：' + passed + '/' + jobs.length + ' 通过', passed === jobs.length);
+  busy(btn, false);
+  $('connMsg').textContent = `测试结束：${passed}/${jobs.length} 通过`;
+  toast(`测试结束：${passed}/${jobs.length} 通过`, passed === jobs.length);
 }
 
-async function restartService() {
-  if (!confirm('确定要重启 Trae2API 服务吗？\n\n进行中的请求会中断，新进程几秒后自动接管。')) return;
-  const btn = $('side-restart');
-  setBusy(btn, true);
-  try {
-    const d = await postJSON('/api/restart', {}, 15000);
-    if (d && (d.ok || d.success)) {
-      $('side-status').textContent = '重启中…';
-      showToast('服务', '正在重启，几秒后自动恢复', true, 6000);
-      const poll = setInterval(async () => {
-        try {
-          const r = await fetch('/healthz', { cache: 'no-store' });
-          if (r.ok) {
-            clearInterval(poll);
-            setBusy(btn, false);
-            $('side-status').textContent = '服务运行中';
-            showToast('服务', '重启完成', true);
-            loadAccounts();
-            loadSummary();
-          }
-        } catch (e) { /* still down, keep polling */ }
-      }, 1500);
-      setTimeout(() => { clearInterval(poll); setBusy(btn, false); }, 30000);
-    } else {
-      setBusy(btn, false);
-      showToast('服务', (d && d.error) || '重启失败', false);
-    }
-  } catch (e) {
-    setBusy(btn, false);
-    showToast('服务', String(e), false);
-  }
-}
-
-/* ───── settings & service ───── */
-function applyPollingGate() {
-  const single = state.accounts.length < 2;
-  ['poll-toggle'].forEach((id) => { const el = $(id); if (el) el.disabled = single; });
-  document.querySelectorAll('input[name=poll-mode]').forEach((el) => { el.disabled = single; });
-  const hint = $('poll-gate-hint');
-  if (hint) hint.style.display = single ? '' : 'none';
-}
+/* ── settings ── */
 async function loadSettings() {
-  const result = await requestJSON('/api/polling', { method: 'GET' }, 10000);
-  const d = result.data;
-  if (result.ok && d) {
-    $('poll-toggle').checked = !!(d.enabled || (d.polling && d.polling.enabled));
+  try {
+    const d = await api('/api/polling');
+    $('pollEnabled').checked = !!(d.enabled || (d.polling && d.polling.enabled));
     const mode = d.mode || (d.polling && d.polling.mode) || 'round-robin';
-    const radio = document.querySelector('input[name=poll-mode][value="' + mode + '"]');
+    const radio = document.querySelector('input[name=pollMode][value="' + mode + '"]');
     if (radio) radio.checked = true;
-  }
+  } catch (e) { /* keep defaults */ }
 }
-async function saveSettings() {
-  const btn = $('settings-save');
-  setBusy(btn, true);
+async function saveSettings(btn) {
+  busy(btn, true);
   try {
-    const mode = (document.querySelector('input[name=poll-mode]:checked') || {}).value || 'round-robin';
-    const d = await postJSON('/api/settings', {
-      checkin_interval: parseInt($('set-checkin-interval').value, 10) || undefined,
-      base_url: $('set-base-url').value.trim() || undefined,
-    }, 20000);
-    const p = await postJSON('/api/polling', { enabled: $('poll-toggle').checked, mode: mode }, 20000);
-    const ok = d.success !== false && p.success !== false;
-    showMsg('settings-msg', ok ? '设置已保存' : ((d.error || p.error) || '保存失败'), ok);
-  } finally {
-    setBusy(btn, false);
-  }
+    const mode = (document.querySelector('input[name=pollMode]:checked') || {}).value || 'round-robin';
+    await post('/api/settings', {
+      checkin_interval: parseInt($('setCheckinInterval').value, 10) || undefined,
+      base_url: $('setBaseUrl').value.trim() || undefined,
+    });
+    await post('/api/polling', { enabled: $('pollEnabled').checked, mode: mode });
+    toast('设置已保存', true);
+    loadSettings();
+  } catch (e) { toast(String(e.message || e), false); }
+  finally { busy(btn, false); }
 }
-async function stopService() {
-  if (!confirm('确定要停止 Trae2API 服务吗？\n\n停止后需手动运行 start-trae2api.cmd 重新启动。')) return;
-  const btn = $('side-stop');
-  setBusy(btn, true);
-  try {
-    const d = await postJSON('/api/stop', {}, 15000);
-    if (d && (d.ok || d.success)) {
-      showToast('服务', '正在停止服务…请用 start-trae2api.cmd 恢复', true, 8000);
-      $('side-dot').classList.add('err');
-      $('side-status').textContent = '已停止';
-    } else {
-      showToast('服务', (d && d.error) || '停止失败', false);
-    }
-  } catch (e) {
-    showToast('服务', String(e), false);
-  } finally {
-    setBusy(btn, false);
-  }
+function applyPollGate(count) {
+  const single = count < 2;
+  $('pollEnabled').disabled = single;
+  document.querySelectorAll('input[name=pollMode]').forEach((el) => { el.disabled = single; });
+  $('pollGateHint').textContent = single ? '（仅 1 个账号，本项无效）' : '';
 }
 
-/* ───── status / copy ───── */
+/* ── service control ── */
+async function doRestart(btn) {
+  if (!confirm('确定重启服务？进行中的请求会中断，新进程几秒后自动接管。')) return;
+  busy(btn, true);
+  try {
+    await post('/api/restart', {}, 15000);
+    $('sideStatusTxt').textContent = '重启中…';
+    toast('正在重启，几秒后自动恢复', true);
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch('/healthz', { cache: 'no-store' });
+        if (r.ok) {
+          clearInterval(poll); busy(btn, false);
+          $('sideStatusTxt').textContent = '运行中';
+          toast('重启完成', true);
+          loadAll();
+        }
+      } catch (e) { /* still down */ }
+    }, 1500);
+    setTimeout(() => { clearInterval(poll); busy(btn, false); }, 30000);
+  } catch (e) { busy(btn, false); toast(String(e.message || e), false); }
+}
+async function doStop(btn) {
+  if (!confirm('确定停止服务？\n\n停止后需手动运行 start-trae2api.cmd 恢复。')) return;
+  busy(btn, true);
+  try {
+    await post('/api/stop', {}, 15000);
+    toast('正在停止服务…请用 start-trae2api.cmd 恢复', true);
+    $('healthDot').className = 'dot err';
+    $('sideStatusTxt').textContent = '已停止';
+  } catch (e) { toast(String(e.message || e), false); }
+  finally { busy(btn, false); }
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast('已复制到剪贴板', true); }
+  catch (e) { toast('复制失败：' + String(e), false); }
+}
+
+/* ── boot ── */
 async function loadStatus() {
-  const result = await requestJSON('/healthz', { method: 'GET' }, 8000);
-  const ok = result.ok;
-  $('side-status').textContent = ok ? '服务运行中' : '服务不可达';
-  $('side-dot').classList.toggle('err', !ok);
-  const status = await requestJSON('/v1/status', { method: 'GET' }, 8000);
-  if (status.ok && status.data) {
-    const d = status.data;
-    $('foot-mode').textContent = d.upstream_mode || '{{UPSTREAM_MODE}}';
-  }
-}
-document.querySelectorAll('[data-copy]').forEach((el) => {
-  el.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(el.getAttribute('data-copy'));
-      showToast('复制', '已复制到剪贴板', true);
-    } catch (e) {
-      showToast('复制', '复制失败：' + String(e), false);
+  try {
+    const r = await fetch('/healthz', { cache: 'no-store' });
+    $('healthDot').className = 'dot' + (r.ok ? '' : ' err');
+    $('sideStatusTxt').textContent = r.ok ? '运行中' : '不可达';
+    if (r.ok) {
+      const s = await api('/v1/status').catch(() => null);
+      $('uptime').textContent = '上游 ' + ((s && s.upstream_mode) || 'solo') + ' · 127.0.0.1:8092';
     }
-  });
-});
-$('acc-key-copy').addEventListener('click', async () => {
-  try {
-    const result = await requestJSON('/api/usage/records', { method: 'GET' }, 5000);
-    void result;
-    await navigator.clipboard.writeText(FULL_API_KEY);
-    showToast('复制', 'API Key 已复制', true);
   } catch (e) {
-    showToast('复制', String(e), false);
-  }
-});
-
-/* ───── wire up ───── */
-async function addManualAccount() {
-  const token = $('manual-token').value.trim();
-  if (!token) { showMsg('manual-msg', 'token 必填', false); return; }
-  const btn = $('manual-add');
-  setBusy(btn, true);
-  try {
-    const d = await postJSON('/api/web-auth', {
-      token: token,
-      refresh_token: $('manual-refresh').value.trim(),
-      user_id: $('manual-user-id').value.trim(),
-      host: $('manual-host').value.trim(),
-      label: $('manual-label').value.trim(),
-    }, 20000);
-    if (d.success === false) { showMsg('manual-msg', d.error || '添加失败', false); return; }
-    showMsg('manual-msg', '账号已添加', true);
-    ['manual-token', 'manual-refresh', 'manual-user-id', 'manual-host', 'manual-label'].forEach((id) => { $(id).value = ''; });
-    loadAccounts();
-  } finally {
-    setBusy(btn, false);
+    $('healthDot').className = 'dot err';
+    $('sideStatusTxt').textContent = '不可达';
   }
 }
-$('manual-add').addEventListener('click', addManualAccount);
-$('side-restart').addEventListener('click', restartService);
-$('ov-refresh').addEventListener('click', () => { loadStatus(); loadAccounts(); loadSummary(); });
-$('acct-refresh').addEventListener('click', refreshCredits);
-$('acct-checkin').addEventListener('click', checkinAll);
-$('auth-btn').addEventListener('click', startAuth);
-$('models-refresh').addEventListener('click', refreshModels);
-$('allow-save').addEventListener('click', saveAllowlist);
-$('usage-refresh').addEventListener('click', refreshUsage);
-$('conn-run-btn').addEventListener('click', runConnTest);
-$('settings-save').addEventListener('click', saveSettings);
-$('side-stop').addEventListener('click', stopService);
-
+function loadAll(btn) {
+  if (btn) busy(btn, true);
+  Promise.all([loadStatus(), loadStats(), loadAccounts(), loadCheckinHistory(), loadUsage()])
+    .finally(() => { if (btn) busy(btn, false); });
+}
 (async function boot() {
-  loadStatus();
-  loadAccounts();
-  loadSummary();
-  loadAllowlist();
-  loadSettings();
-  loadCheckinHistory();
-  refreshUsage();
-  refreshModels();
+  showView((location.hash || '#/overview').slice(2) || 'overview');
+  $('accKey').textContent = FULL_API_KEY ? (FULL_API_KEY.slice(0, 12) + '…' + FULL_API_KEY.slice(-4)) : '(未设置)';
+  await Promise.all([loadStatus(), loadStats(), loadAccounts(), loadCheckinHistory(), loadUsage(), loadAllowlist(), loadSettings()]);
 })();
 </script>
 </body>

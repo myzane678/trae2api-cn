@@ -64,6 +64,7 @@ from . import (
     traework_native_bridge,
 )
 from .model_limits import clamp_max_completion_tokens
+from .stats_agg import stats_agg
 from .sse import (
     EmptyUpstreamResponse,
     ModelProviderMismatch,
@@ -327,6 +328,7 @@ PUBLIC_PATHS = {
     "/api/usage/last",
     "/api/usage/records",
     "/api/usage/summary",
+    "/api/stats",
     "/api/checkin/history",
     "/api/allowlist",
     "/api/model-test",
@@ -3004,6 +3006,17 @@ def _record_usage(
         if len(_USAGE_HISTORY) > _USAGE_MAX_HISTORY:
             _USAGE_HISTORY = _USAGE_HISTORY[:_USAGE_MAX_HISTORY]
         _save_usage_history_locked()
+    # The capped raw log cannot back lifetime totals or a 7-day trend; feed the
+    # permanent daily rollup as well (workbuddy2api's console works this way).
+    stats_agg.record(
+        model=record.get("model") or "",
+        in_tok=int(record.get("prompt_tokens") or 0),
+        out_tok=int(record.get("completion_tokens") or 0),
+        credit=record.get("credits_consumed"),
+        ok=str(record.get("status") or "").lower() in ("completed", "ok", ""),
+        ttfb_ms=record.get("ttfb_ms"),
+        ts=record.get("timestamp"),
+    )
     return record
 
 
@@ -3447,6 +3460,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Trae CN Relay", version="1.2.0", lifespan=lifespan)
+
+
+@app.get("/api/stats")
+async def api_stats():
+    """Aggregated console payload: totals, today, 7-day series, model split."""
+    return JSONResponse(stats_agg.snapshot())
 
 
 @app.get("/api/usage/summary")

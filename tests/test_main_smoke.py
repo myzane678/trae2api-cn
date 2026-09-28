@@ -1493,8 +1493,8 @@ class UsageRecordTests(unittest.TestCase):
         # the rendered page must carry the functional anchors and its JS escapes
         # must survive rendering intact.
         html = main_module._web_login_html()
-        self.assertIn("requestJSON", html)
-        self.assertIn("postJSON", html)
+        self.assertIn("async function api(", html)
+        self.assertIn("async function post(", html)
         # Functional anchors: every admin capability must stay wired.
         for api in (
             "/api/checkin/accounts",
@@ -1526,11 +1526,11 @@ class UsageRecordTests(unittest.TestCase):
             self.assertNotIn(placeholder, html)
         # Batch vs single check-in stay isolated: the bulk action must not be
         # reachable from the per-account handler.
-        single_start = html.index("async function checkinAccount(id)")
-        single_end = html.index("async function checkinAll()", single_start)
+        single_start = html.index("async function checkinOne(")
+        single_end = html.index("async function doCheckin(", single_start)
         single_account = html[single_start:single_end]
-        self.assertNotIn("checkinAll()", single_account)
-        self.assertIn("/api/checkin/claim", single_account)
+        self.assertNotIn("claim-all", single_account)
+        self.assertIn("/api/checkin/claim'", single_account)
 
 
 class _FakeUsageTracker:
@@ -3056,11 +3056,11 @@ class MainCliSmokeTests(unittest.TestCase):
     def test_dashboard_exposes_model_connectivity_panel(self):
         html = main_module._web_login_html()
         for token in (
-            "conn-run-btn",
             "runConnTest",
             "/api/model-test",
-            "conn-tbody",
-            "conn-mode-tool",
+            "connBody",
+            "connTool",
+            "connTable",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, html)
@@ -3095,7 +3095,7 @@ class MainCliSmokeTests(unittest.TestCase):
     def test_web_login_has_model_refresh_button(self):
         response = self.client.get("/web/login")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("refreshModels", response.text)
+        self.assertIn("refreshCatalog", response.text)
         self.assertIn("刷新模型列表", response.text)
 
     def test_web_login_usage_panel_is_below_account_list(self):
@@ -3103,14 +3103,14 @@ class MainCliSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         # Sidebar navigation order: accounts before usage, usage before settings.
         nav = response.text
-        account_index = nav.index('data-view="accounts"')
-        usage_index = nav.index('data-view="usage"')
-        settings_index = nav.index('data-view="settings"')
-        self.assertLess(account_index, usage_index)
-        self.assertLess(usage_index, settings_index)
+        account_index = nav.index('data-v="accounts"')
+        logs_index = nav.index('data-v="logs"')
+        conn_index = nav.index('data-v="conn"')
+        self.assertLess(account_index, logs_index)
+        self.assertLess(logs_index, conn_index)
         # Usage keeps its own view and rendering table.
-        self.assertIn('id="view-usage"', nav)
-        self.assertIn('id="usage-body"', nav)
+        self.assertIn('id="view-logs"', nav)
+        self.assertIn('id="logBody"', nav)
 
     def test_usage_records_are_public_for_the_login_console(self):
         response = self.client.get("/api/usage/records")
@@ -3124,7 +3124,7 @@ class MainCliSmokeTests(unittest.TestCase):
     def test_web_login_public(self):
         response = self.client.get("/web/login")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("\u7528 Trae \u7f51\u9875\u6388\u6743\u767b\u5f55", response.text)
+        self.assertIn("授权登录", response.text)
 
         download = self.client.get("/web/login/download")
         self.assertEqual(download.status_code, 200)
