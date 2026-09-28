@@ -117,6 +117,7 @@ docker compose up -d --build
 | `TRAE_CHECKIN_9074_RETRY_SECONDS` | `60` | 上游返回业务码 9074 后提示的最短重试等待时间；relay 不会立即重复 claim |
 | `TRAE_CHECKIN_9074_MAX_BACKOFF_SECONDS` | `3600` | 连续 9074 指数退避的等待上限（秒） |
 | `TRAE_CHECKIN_AUTO_RETRY_INTERVAL_SECONDS` | `60` | 后台自动错峰重试的扫描间隔（秒），到点自动 claim 冷却到期的账号 |
+| `TRAE_CONSOLE_ACCOUNT_TTL_SECONDS` | `120` | 控制台轮询账号接口时复用缓存探测结果的秒数；避免开着页面就变成对上游的持续探测。手动「刷新数据」和签到后的自动重载会绕过它强制探测 |
 | `TRAE_RAW_BASE_URL` | `https://trae-api-cn.mchost.guru` | Trae raw v2 `llm_raw_chat` 网关；账号站 `api.trae.com.cn` 不提供此模型端点 |
 | `TRAE_RAW_MAX_MESSAGES` | `80` | raw 请求保留的非系统历史消息上限；会保留最近连续历史及边界工具调用配对 |
 | `TRAE_RAW_MAX_HISTORY_CHARS` | `120000` | raw 历史文本字符上限，避免重复工具 schema 和过长历史造成额外消费 |

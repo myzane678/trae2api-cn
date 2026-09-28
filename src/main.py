@@ -147,6 +147,15 @@ CHECKIN_9074_BACKOFF_EXPONENT_CAP = max(
 CHECKIN_AUTO_RETRY_INTERVAL = float(
     os.environ.get("TRAE_CHECKIN_AUTO_RETRY_INTERVAL_SECONDS", "60") or "60"
 )
+# The console polls its account endpoint while it is open.  Probing Trae on
+# every poll would turn an idle dashboard into a steady upstream heartbeat, so
+# a recently probed account is served from cache; the manual refresh button and
+# every post-action reload pass fresh=1 to force a real probe.  Two minutes
+# keeps the credits card visibly live at ~24x less upstream traffic than
+# probing on each 10s poll.
+CONSOLE_ACCOUNT_TTL = max(
+    5.0, float(os.environ.get("TRAE_CONSOLE_ACCOUNT_TTL_SECONDS", "120") or "120")
+)
 WEB_BASE = (os.environ.get("TRAE_WEB_BASE_URL", "https://trae-api-cn.mchost.guru/api/remote/v1")).rstrip("/")
 CHAT_OPTION_FIELDS = (
     "tools",
@@ -245,6 +254,9 @@ _CHECKIN_COOLDOWN_UNTIL: dict[str, float] = {}
 # freeze the dashboard on a stale checked_in value.
 _CHECKIN_STATUS_COOLDOWN_UNTIL: dict[str, float] = {}
 _CHECKIN_ACCEPTED_UNTIL: dict[str, float] = {}
+# Wall-clock of the last console-driven status probe per account.  Records a
+# failed probe too, so an unreachable account is not re-probed on every poll.
+_CONSOLE_PROBE_AT: dict[str, float] = {}
 _CHECKIN_TIMEZONE = timezone(timedelta(hours=8), name="Asia/Shanghai")
 # Kept as a compatibility knob for older integrations; claim no longer runs
 # automatic verification probes.
@@ -4027,20 +4039,28 @@ async def api_checkin_status():
     return JSONResponse({"success": True, "data": data})
 
 @app.get("/api/checkin/accounts")
-async def api_checkin_accounts():
+async def api_checkin_accounts(request: Request):
     """Refresh daily checkin state only for every stored account.
 
     Entitlement credits use a different upstream API and are intentionally
     refreshed through ``/api/checkin/credits/accounts``. Keeping these probes
     apart stops an ordinary dashboard refresh from creating extra checkin
     traffic while a user is recovering from code 9074.
+
+    The console polls this endpoint while it is open, so a probe newer than
+    ``CONSOLE_ACCOUNT_TTL`` is served from cache.  ``fresh=1`` (the manual
+    refresh button) always probes.
     """
+    force = request.query_params.get("fresh", "").lower() in {"1", "true", "yes"}
     raw_accounts = auth.get_accounts_raw()
 
     async def _query_one(aid: str, rec: dict) -> dict:
         row = _cached_checkin_account_snapshot(aid, rec)
         if not (rec.get("token") or ""):
             row["error"] = "No token"
+            return row
+        if not force and _console_probe_is_fresh(aid):
+            row["cached"] = True
             return row
         try:
             async with _checkin_account_lock(aid):
@@ -4049,7 +4069,11 @@ async def api_checkin_accounts():
                         aid, rec, use_cached_on_cooldown=True
                     )
                 )
+            _CONSOLE_PROBE_AT[aid] = time.time()
         except Exception as e:
+            # Remember the failure too: a broken account must not be re-probed
+            # on every console poll.
+            _CONSOLE_PROBE_AT[aid] = time.time()
             row["error"] = str(e)
         return row
 
@@ -4465,6 +4489,12 @@ def _checkin_status_cooldown_remaining(account_id: str) -> int:
         _CHECKIN_STATUS_COOLDOWN_UNTIL.pop(account_id, None)
         return 0
     return max(1, int(remaining))
+
+
+def _console_probe_is_fresh(account_id: str) -> bool:
+    """True when the console may reuse the last probe instead of hitting Trae."""
+    last = _CONSOLE_PROBE_AT.get(account_id, 0.0)
+    return last > 0 and (time.time() - last) < CONSOLE_ACCOUNT_TTL
 
 
 def _checkin_cooldown_remaining(account_id: str) -> int:

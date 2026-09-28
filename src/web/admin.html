@@ -50,6 +50,11 @@ body{min-height:100vh;background:var(--bg)}
 .navitem.red{color:var(--err)}
 .navitem.red:hover{background:#fef2f2;color:#b91c1c}
 .sfoot{padding:10px 12px 14px;border-top:1px solid var(--soft2);display:flex;flex-direction:column;gap:3px}
+.sfoot .navitem.off{color:var(--dim2)}
+.livedot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none;margin-left:auto;
+  box-shadow:0 0 0 3px rgba(5,150,105,.14);animation:breathe 2.4s ease-in-out infinite}
+.sfoot .navitem.off .livedot{background:#9ca3af;box-shadow:none;animation:none}
+.sfoot .navitem .age{font-size:11.5px;color:var(--dim2);font-variant-numeric:tabular-nums}
 
 /* ───── main ───── */
 .main{margin-left:var(--sidew);min-height:100vh}
@@ -259,6 +264,12 @@ tbody tr:last-child td{border-bottom:0}
       连接测试</a>
   </nav>
   <div class="sfoot">
+    <button class="navitem" id="liveBtn" onclick="toggleLive()" title="点击暂停 / 恢复自动刷新">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>
+      <span id="liveTxt">自动刷新</span>
+      <span class="age" id="liveAge"></span>
+      <span class="livedot" id="liveDot"></span>
+    </button>
     <button class="navitem" onclick="loadAll(this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>
       刷新数据</button>
@@ -469,9 +480,11 @@ function toast(text, ok) {
   clearTimeout(el._t);
   el._t = setTimeout(() => { el.style.display = 'none'; }, ok === false ? 8000 : 3000);
 }
+let _inflight = 0;
 async function api(url, init, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs || 30000);
+  _inflight++;
   try {
     const r = await fetch(url, Object.assign({ cache: 'no-store' }, init || {}, { signal: ctrl.signal }));
     const text = await r.text();
@@ -479,7 +492,7 @@ async function api(url, init, timeoutMs) {
     try { data = JSON.parse(text); } catch (e) { data = null; }
     if (!r.ok) throw new Error((data && (data.error || data.message)) || ('HTTP ' + r.status));
     return data;
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); _inflight--; }
 }
 async function post(url, payload, timeoutMs) {
   return api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}) }, timeoutMs);
@@ -525,12 +538,18 @@ const PALETTE = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6
 async function loadStats() {
   try { statsData = await api('/api/stats'); renderOverview(); } catch (e) { /* keep previous */ }
 }
+let _ovSig = '';
 function renderOverview() {
   if (!statsData) return;
   const t = statsData.today, tot = statsData.total;
   const tTok = (t.in_tok || 0) + (t.out_tok || 0);
   const totTok = (tot.in_tok || 0) + (tot.out_tok || 0);
   const credit = lastOverview && lastOverview.credits;
+  // The live poll re-renders every 10s; rebuilding identical markup would
+  // restart the donut/tooltip transitions for no reason.
+  const sig = JSON.stringify([statsData, credit === undefined ? null : credit]);
+  if (sig === _ovSig) return;
+  _ovSig = sig;
   $('usage').innerHTML = [
     card(2, '今日 Tokens', fmtTok(tTok), `输入 ${fmtTok(t.in_tok)} / 输出 ${fmtTok(t.out_tok)}`),
     card(1, '累计 Tokens', fmtTok(totTok), totTok ? `${fmtYi(totTok)} · 自 ${(tot.since || '').slice(5)} 起` : '–'),
@@ -582,9 +601,11 @@ function renderDist() {
 }
 
 /* ── accounts ── */
-async function loadAccounts() {
+let _acctSig = '';
+async function loadAccounts(force) {
   let d;
-  try { d = await api('/api/checkin/accounts'); } catch (e) { $('accounts').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  try { d = await api('/api/checkin/accounts' + (force ? '?fresh=1' : '')); }
+  catch (e) { $('accounts').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   const accts = d.accounts || [];
   const active = accts.find((a) => a.id === d.active) || accts[0];
   lastOverview = Object.assign({}, lastOverview, { credits: null });
@@ -594,18 +615,24 @@ async function loadAccounts() {
   }
   $('acctHint').textContent = accts.length + ' 个账号 · 当前 ' + ((active && (active.label || active.user_id)) || '–');
   if (statsData) renderOverview();
-  $('accounts').innerHTML = accts.length ? accts.map((a) => {
-    const isActive = a.id === d.active;
-    const gen = (a.credits && a.credits.account_credits) || a.account_credits || {};
-    const total = (a.credits && a.credits.total_credits) || a.total_credits || {};
-    const checked = a.checked_in || (a.checkin && a.checkin.checked_in);
-    const rem = gen.unlimited ? '∞' : (gen.remaining !== undefined && gen.remaining !== null ? Number(gen.remaining).toFixed(0) : '–');
-    const tot = total.unlimited ? '∞' : (total.remaining !== undefined && total.remaining !== null ? Number(total.remaining).toFixed(0) : '–');
-    const ini = esc((a.label || a.user_id || '?').trim().charAt(0).toUpperCase() || '?');
-    const sc = a.is_valid === false ? 'bad' : checked ? 'ok' : 'cool';
-    const st = a.is_valid === false ? '<span class="tag bad">失效</span>'
-      : checked ? '<span class="tag ok">已签到</span>' : '<span class="tag cool">未签到</span>';
-    return `<div class="acct ac-${sc}${isActive ? ' active' : ''}">
+  // Auto-refresh must not rebuild the list under the cursor (a click landing
+  // between render and handler would hit a detached node), so only re-render
+  // when the payload actually changed.
+  const sig = JSON.stringify(accts) + '|' + d.active;
+  if (sig !== _acctSig || force) {
+    _acctSig = sig;
+    $('accounts').innerHTML = accts.length ? accts.map((a) => {
+      const isActive = a.id === d.active;
+      const gen = (a.credits && a.credits.account_credits) || a.account_credits || {};
+      const total = (a.credits && a.credits.total_credits) || a.total_credits || {};
+      const checked = a.checked_in || (a.checkin && a.checkin.checked_in);
+      const rem = gen.unlimited ? '∞' : (gen.remaining !== undefined && gen.remaining !== null ? Number(gen.remaining).toFixed(0) : '–');
+      const tot = total.unlimited ? '∞' : (total.remaining !== undefined && total.remaining !== null ? Number(total.remaining).toFixed(0) : '–');
+      const ini = esc((a.label || a.user_id || '?').trim().charAt(0).toUpperCase() || '?');
+      const sc = a.is_valid === false ? 'bad' : checked ? 'ok' : 'cool';
+      const st = a.is_valid === false ? '<span class="tag bad">失效</span>'
+        : checked ? '<span class="tag ok">已签到</span>' : '<span class="tag cool">未签到</span>';
+      return `<div class="acct ac-${sc}${isActive ? ' active' : ''}">
       <div class="ahead">${ini}</div>
       <div class="amain">
         <div class="arow"><b>${esc(a.label || a.user_id || a.id)}</b>${isActive ? '<span class="tag info">当前</span>' : ''}${st}
@@ -622,7 +649,8 @@ async function loadAccounts() {
           <button class="btn danger" onclick="removeAccount('${esc(a.id)}')">删除</button>
         </div>
       </div></div>`;
-  }).join('') : '<div class="empty">无账号，点右上角「授权登录」添加</div>';
+    }).join('') : '<div class="empty">无账号，点右上角「授权登录」添加</div>';
+  }
   applyPollGate(accts.length);
   const allDone = accts.length > 0 && accts.every((a) => a.checked_in || (a.checkin && a.checkin.checked_in));
   const b = $('btnCheckin');
@@ -635,19 +663,19 @@ async function checkinOne(id, btn) {
     if (d.success) toast(d.skipped ? '今日已签过到' : ('签到成功' + (d.claimed_credits != null ? '，本次 +' + d.claimed_credits : '')), true);
     else toast(d.error || '签到失败', false);
   } catch (e) { toast(String(e.message || e), false); }
-  finally { busy(btn, false); loadAccounts(); loadCheckinHistory(); loadStats(); }
+  finally { busy(btn, false); loadAccounts(true); loadCheckinHistory(); loadStats(); }
 }
 async function doCheckin(btn) {
   busy(btn, true);
   try { await post('/api/checkin/claim-all', {}, 90000); toast('批量签到完成，明细见签到记录', true); }
   catch (e) { toast(String(e.message || e), false); }
-  finally { busy(btn, false); loadAccounts(); loadCheckinHistory(); loadStats(); }
+  finally { busy(btn, false); loadAccounts(true); loadCheckinHistory(); loadStats(); }
 }
 async function switchAccount(id, btn) {
   busy(btn, true);
   try { await post('/api/accounts/switch', { account_id: id }); toast('已切换账号', true); }
   catch (e) { toast(String(e.message || e), false); }
-  finally { busy(btn, false); loadAccounts(); loadStats(); }
+  finally { busy(btn, false); loadAccounts(true); loadStats(); }
 }
 async function removeAccount(id) {
   if (!confirm('确定删除该账号？凭证将从本机移除。')) return;
@@ -659,12 +687,16 @@ async function refreshCredits(btn) {
   busy(btn, true);
   try { await api('/api/checkin/credits/accounts', null, 40000); toast('积分已刷新', true); }
   catch (e) { toast(String(e.message || e), false); }
-  finally { busy(btn, false); loadAccounts(); loadStats(); }
+  finally { busy(btn, false); loadAccounts(true); loadStats(); }
 }
+let _chkSig = '';
 async function loadCheckinHistory() {
   let d;
   try { d = await api('/api/checkin/history'); } catch (e) { return; }
   const rows = (d && d.records) || [];
+  const sig = JSON.stringify(rows);
+  if (sig === _chkSig) return;
+  _chkSig = sig;
   $('checkinBody').innerHTML = rows.length
     ? rows.slice(0, 20).map((r) => `<tr><td class="mono">${fmtTime(r.timestamp)}</td><td>${esc(r.label || r.account_id || '–')}</td><td class="mono">${r.credits != null ? '+' + esc(String(r.credits)) : '–'}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty">还没有签到记录</td></tr>';
@@ -681,7 +713,7 @@ async function addManualAccount(btn) {
     });
     toast('账号已添加', true);
     ['manualToken', 'manualRefresh', 'manualUserId', 'manualHost', 'manualLabel'].forEach((id) => { $(id).value = ''; });
-    loadAccounts();
+    loadAccounts(true);
   } catch (e) { toast(String(e.message || e), false); }
   finally { busy(btn, false); }
 }
@@ -712,7 +744,7 @@ async function startAuth() {
   if (!w) { toast('浏览器拦截了弹窗，请允许后重试', false); return; }
   toast('请在弹出的 Trae 授权页完成登录…', true);
   const poll = setInterval(() => {
-    if (w.closed) { clearInterval(poll); loadAccounts(); loadCheckinHistory(); }
+    if (w.closed) { clearInterval(poll); loadAccounts(true); loadCheckinHistory(); }
   }, 700);
 }
 
@@ -789,11 +821,17 @@ function fillConnModels() {
 }
 
 /* ── logs ── */
-async function loadUsage(btn) {
+let _logSig = '';
+async function loadUsage(force) {
+  const btn = force === true ? null : force;
   if (btn) busy(btn, true);
   try {
     const d = await api('/api/usage/records');
     const rows = Array.isArray(d) ? d : ((d && (d.records || d.data)) || []);
+    // Re-rendering resets the scroll position, so skip an unchanged payload.
+    const sig = JSON.stringify(rows);
+    if (sig === _logSig && force !== true) return;
+    _logSig = sig;
     $('logBody').innerHTML = rows.length ? rows.map((r) => {
       const st = String(r.status || '').toLowerCase();
       const ok = st === 'completed' || st === 'ok' || st === '';
@@ -936,13 +974,64 @@ async function loadStatus() {
 }
 function loadAll(btn) {
   if (btn) busy(btn, true);
-  Promise.all([loadStatus(), loadStats(), loadAccounts(), loadCheckinHistory(), loadUsage()])
+  Promise.all([loadStatus(), loadStats(), loadAccounts(true), loadCheckinHistory(), loadUsage(true)])
     .finally(() => { if (btn) busy(btn, false); });
 }
+
+/* ── live refresh ── */
+// Local data (stats, logs, checkin history) is cheap to poll; the account
+// endpoint is throttled server-side by CONSOLE_ACCOUNT_TTL so an idle console
+// does not turn into a steady upstream heartbeat.
+const LIVE_MS = 10000;
+let liveOn = true, liveTimer = null, liveAt = 0, liveTick = null;
+
+async function liveRefresh() {
+  if (_inflight > 0) return;               // never stack on a slow request
+  if (document.hidden) return;             // nothing to update off-screen
+  liveAt = Date.now();
+  try {
+    await Promise.all([
+      loadStatus(), loadStats(), loadAccounts(), loadCheckinHistory(), loadUsage(),
+    ]);
+  } catch (e) { /* transient; next tick retries */ }
+  paintLive();
+}
+function paintLive() {
+  const dot = $('liveDot');
+  if (!dot) return;
+  const btn = $('liveBtn');
+  btn.classList.toggle('off', !liveOn);
+  $('liveTxt').textContent = liveOn ? '自动刷新' : '已暂停';
+  const age = liveAt ? Math.round((Date.now() - liveAt) / 1000) : null;
+  $('liveAge').textContent = !liveOn ? '' : (age === null ? '' : age + 's');
+}
+function toggleLive() {
+  liveOn = !liveOn;
+  if (liveOn) { startLive(); liveRefresh(); toast('已恢复自动刷新', true); }
+  else { stopLive(); toast('已暂停自动刷新', true); }
+  paintLive();
+}
+function startLive() {
+  stopLive();
+  liveTimer = setInterval(liveRefresh, LIVE_MS);
+  liveTick = setInterval(paintLive, 1000);
+}
+function stopLive() {
+  if (liveTimer) clearInterval(liveTimer);
+  if (liveTick) clearInterval(liveTick);
+  liveTimer = liveTick = null;
+}
+// A hidden tab keeps polling in some browsers; re-sync on return so the
+// dashboard is never showing stale numbers when the user looks at it again.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && liveOn) liveRefresh(); });
+
 (async function boot() {
   showView((location.hash || '#/overview').slice(2) || 'overview');
   $('accKey').textContent = FULL_API_KEY ? (FULL_API_KEY.slice(0, 12) + '…' + FULL_API_KEY.slice(-4)) : '(未设置)';
   await Promise.all([loadStatus(), loadStats(), loadAccounts(), loadCheckinHistory(), loadUsage(), loadAllowlist(), loadSettings()]);
+  liveAt = Date.now();
+  startLive();
+  paintLive();
 })();
 </script>
 </body>

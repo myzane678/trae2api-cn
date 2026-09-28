@@ -41,6 +41,92 @@ class CheckinResultTests(unittest.TestCase):
         main_module._CHECKIN_NEXT_CLAIM_AT = 0.0
         main_module._CHECKIN_COOLDOWN_UNTIL.clear()
         main_module._CHECKIN_ACCEPTED_UNTIL.clear()
+        main_module._CONSOLE_PROBE_AT.clear()
+
+    def _console_request(self, url: str = "/api/checkin/accounts"):
+        from starlette.requests import Request
+
+        return Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/api/checkin/accounts",
+                "query_string": url.partition("?")[2].encode(),
+                "headers": [],
+            }
+        )
+
+    def test_console_poll_reuses_recent_probe_instead_of_hitting_upstream(self):
+        # An open console polls every 10s. Without the TTL that becomes a
+        # steady probe heartbeat against Trae, which is the behaviour the
+        # checkin path deliberately avoids.
+        raw_accounts = [("account-1", {"token": "test-token"})]
+        status = AsyncMock(return_value={"checked_in": True, "credits": 200})
+        with (
+            patch("src.main.auth.get_accounts_raw", return_value=raw_accounts),
+            patch("src.main.auth.get_active_account_id", return_value="account-1"),
+            patch("src.main.trae_client.fetch_checkin_credits_status", new=status),
+            patch("src.main.auth.merge_account_checkin", side_effect=lambda _a, d: dict(d)),
+        ):
+            first = asyncio.run(main_module.api_checkin_accounts(self._console_request()))
+            second = asyncio.run(main_module.api_checkin_accounts(self._console_request()))
+
+        self.assertEqual(status.await_count, 1)
+        first_body = json.loads(first.body)
+        second_body = json.loads(second.body)
+        self.assertNotIn("cached", first_body["accounts"][0])
+        self.assertTrue(second_body["accounts"][0]["cached"])
+
+    def test_console_manual_refresh_forces_a_real_probe(self):
+        raw_accounts = [("account-1", {"token": "test-token"})]
+        status = AsyncMock(return_value={"checked_in": True, "credits": 200})
+        with (
+            patch("src.main.auth.get_accounts_raw", return_value=raw_accounts),
+            patch("src.main.auth.get_active_account_id", return_value="account-1"),
+            patch("src.main.trae_client.fetch_checkin_credits_status", new=status),
+            patch("src.main.auth.merge_account_checkin", side_effect=lambda _a, d: dict(d)),
+        ):
+            asyncio.run(main_module.api_checkin_accounts(self._console_request()))
+            forced = asyncio.run(
+                main_module.api_checkin_accounts(
+                    self._console_request("/api/checkin/accounts?fresh=1")
+                )
+            )
+
+        self.assertEqual(status.await_count, 2)
+        self.assertNotIn("cached", json.loads(forced.body)["accounts"][0])
+
+    def test_console_probe_ttl_expiry_allows_a_new_probe(self):
+        raw_accounts = [("account-1", {"token": "test-token"})]
+        status = AsyncMock(return_value={"checked_in": True, "credits": 200})
+        with (
+            patch("src.main.auth.get_accounts_raw", return_value=raw_accounts),
+            patch("src.main.auth.get_active_account_id", return_value="account-1"),
+            patch("src.main.trae_client.fetch_checkin_credits_status", new=status),
+            patch("src.main.auth.merge_account_checkin", side_effect=lambda _a, d: dict(d)),
+            patch("src.main.CONSOLE_ACCOUNT_TTL", 30.0),
+        ):
+            with patch("src.main.time.time", return_value=1000.0):
+                asyncio.run(main_module.api_checkin_accounts(self._console_request()))
+            # 31s later the cached row is stale and must be re-probed.
+            with patch("src.main.time.time", return_value=1031.0):
+                asyncio.run(main_module.api_checkin_accounts(self._console_request()))
+
+        self.assertEqual(status.await_count, 2)
+
+    def test_console_probe_ttl_also_covers_failed_probes(self):
+        # A broken account must not be re-probed on every console poll either.
+        raw_accounts = [("account-1", {"token": "test-token"})]
+        status = AsyncMock(side_effect=RuntimeError("upstream down"))
+        with (
+            patch("src.main.auth.get_accounts_raw", return_value=raw_accounts),
+            patch("src.main.auth.get_active_account_id", return_value="account-1"),
+            patch("src.main.trae_client.fetch_checkin_credits_status", new=status),
+        ):
+            asyncio.run(main_module.api_checkin_accounts(self._console_request()))
+            asyncio.run(main_module.api_checkin_accounts(self._console_request()))
+
+        self.assertEqual(status.await_count, 1)
 
     def test_only_zero_business_code_is_success(self):
         self.assertTrue(_checkin_claim_ok({"code": 0, "message": "success"}))
@@ -1531,6 +1617,21 @@ class UsageRecordTests(unittest.TestCase):
         single_account = html[single_start:single_end]
         self.assertNotIn("claim-all", single_account)
         self.assertIn("/api/checkin/claim'", single_account)
+
+    def test_rendered_console_ships_the_live_refresh_loop(self):
+        # The console must keep itself current; every piece of the live loop is
+        # load-bearing, so guard the wiring rather than just the endpoint list.
+        html = main_module._web_login_html()
+        self.assertIn("function liveRefresh(", html)
+        self.assertIn("function toggleLive(", html)
+        self.assertIn("startLive();", html)
+        # Post-action reloads must bypass the account TTL, otherwise a checkin
+        # the user just performed would be masked by the cached row.
+        self.assertIn("loadAccounts(true)", html)
+        self.assertIn("fresh=1", html)
+        # An unchanged payload must not rebuild the list under the cursor.
+        self.assertIn("_acctSig", html)
+        self.assertIn("_logSig", html)
 
 
 class _FakeUsageTracker:
