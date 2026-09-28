@@ -4407,11 +4407,23 @@ async def status():
 
 @app.get("/api/allowlist")
 async def api_allowlist_get():
+    all_ids = []
     try:
-        items = await trae_client.get_models(force=False)
-        all_ids = sorted({str(e.get("id", "")).strip() for e in items if e.get("id")})
+        if UPSTREAM_MODE in ("solo", "solo-lite", "llm_utils_chat"):
+            # The picker must offer what the active upstream actually serves;
+            # the legacy trae_client table lists models SOLO does not have.
+            account_id = str(auth.get_active_account_id() or "default")
+            record = auth.get_account_record(account_id) or {}
+            token = str(record.get("token") or auth.get_token() or "").strip()
+            user_id = str(record.get("user_id") or account_id or "")
+            if token:
+                async with httpx.AsyncClient(timeout=None) as client:
+                    items = await trae_solo.get_models(client, token, user_id, force=False)
+                all_ids = sorted({str(e.get("id", "")).strip() for e in items if e.get("id")})
+        else:
+            items = await trae_client.get_models(force=False)
+            all_ids = sorted({str(e.get("id", "")).strip() for e in items if e.get("id")})
     except Exception as exc:
-        all_ids = []
         logger.warning("allowlist fetch all ids failed: %s", exc)
     return {
         "success": True,

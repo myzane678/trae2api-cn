@@ -312,9 +312,15 @@ async def fetch_model_catalog(
             if not isinstance(config, Mapping):
                 continue
             name = str(config.get("config_name") or "").strip()
-            if not name or name.startswith("custom_model"):
+            if not name or config.get("config_switch") is False:
                 continue
-            if name in {"summary"} or name.endswith("_agent") or name.endswith("_subagent") or name.endswith("_sub_agent_v2"):
+            # Internal pipeline slots are not chat models; everything else is
+            # kept, including the custom_model_* entries that carry the large
+            # context variants (custom_model_1M / custom_model_deepseek_v4 are
+            # the 1M-window options and were previously filtered out by prefix).
+            if name == "summary" or name.endswith(("_agent", "_subagent", "_sub_agent_v2")):
+                continue
+            if name == "custom_model_placeholder":
                 continue
             seen.setdefault(name, dict(config))
     return list(seen.values())
@@ -348,11 +354,22 @@ def catalog_model_entry(config: Mapping[str, Any]) -> dict[str, Any]:
     except (TypeError, ValueError):
         contact = {}
     rate = ((contact.get("consumption_rate") or {}).get("data") or {}).get("rate")
+    # The custom_model_* configs are internal aliases: the 1M/816K entries carry
+    # no display name, so give them a readable one and mark the family.
+    label = display.get("display_name") or ""
+    if not label:
+        label = name.replace("custom_model_", "").replace("_", " ")
     return {
         "id": name,
         "object": "model",
         "owned_by": "trae",
-        "display_name": display.get("display_name") or name,
+        "display_name": label,
+        "custom": name.startswith("custom_model_"),
+        # Internal alias slots (custom_model_*) advertise the large windows but
+        # reject direct calls with business code 4023 on consumer accounts -
+        # they are entitlement-gated.  Flag them so the console can say so
+        # instead of presenting them as usable.
+        "alias_only": name.startswith("custom_model_"),
         # OpenAI clients read context_window; report the enforced prompt budget
         # when known, falling back to the advertised tier number.
         "context_window": prompt_max or advertised,
