@@ -472,20 +472,60 @@ async def get_models(
 # ──────────────────────────── risk control ────────────────────────────
 
 
-_account_gates: dict[str, asyncio.Semaphore] = {}
-_gates_lock = asyncio.Lock()
+# ── account cooldown state machine (mirrors trae2api-web's pool) ──
+# The reference implementation does NOT cap concurrency with a semaphore: a
+# semaphore that leaks on an aborted request blocks every later call on that
+# account (observed as requests hanging for the full 5-minute timeout with
+# upstream_ready=False).  Instead it lets requests flow and cools an account
+# down when the upstream signals trouble, which also matches how the gateway
+# actually rate-limits (per-account business codes, not connection counts).
+_COOLDOWN_SECONDS = {
+    "plan": 12 * 3600,   # 1005 plan/entitlement exhausted
+    "soft": 60,          # 429 / transient rate limit
+    "error": 10 * 60,    # repeated failures
+}
+_account_cooldown: dict[str, tuple[float, str]] = {}
+_cooldown_lock = asyncio.Lock()
 
 
-async def account_gate(account_id: str) -> asyncio.Semaphore:
-    """Per-account concurrency cap; upstream tolerates ~2 parallel sessions."""
+async def account_cooling(account_id: str) -> tuple[bool, float, str]:
+    """Return (cooling, seconds_left, reason) for one account."""
     key = str(account_id or "default")
-    async with _gates_lock:
-        gate = _account_gates.get(key)
-        if gate is None:
-            limit = int(os.environ.get("TRAE_SOLO_MAX_PARALLEL", "2") or "2")
-            gate = asyncio.Semaphore(max(1, min(limit, 4)))
-            _account_gates[key] = gate
-        return gate
+    async with _cooldown_lock:
+        entry = _account_cooldown.get(key)
+        if entry is None:
+            return False, 0.0, ""
+        until, reason = entry
+        left = until - time.monotonic()
+        if left <= 0:
+            _account_cooldown.pop(key, None)
+            return False, 0.0, ""
+        return True, left, reason
+
+
+async def cool_account(account_id: str, kind: str, detail: str = "") -> None:
+    """Put an account in cooldown after an upstream-side failure."""
+    key = str(account_id or "default")
+    seconds = _COOLDOWN_SECONDS.get(kind, _COOLDOWN_SECONDS["error"])
+    async with _cooldown_lock:
+        _account_cooldown[key] = (time.monotonic() + seconds, detail or kind)
+    logger.warning(
+        "account %s cooling %ss (%s) %s", key, seconds, kind, detail
+    )
+
+
+async def clear_cooldown(account_id: str) -> None:
+    """Clear an account's cooldown after a successful turn."""
+    async with _cooldown_lock:
+        _account_cooldown.pop(str(account_id or "default"), None)
+
+
+def cooldown_kind_for(code: int) -> str:
+    if code == CODE_PLAN_LIMIT:
+        return "plan"
+    if code == CODE_RATE_LIMIT:
+        return "soft"
+    return "error"
 
 
 def classify_payload_error(data: Mapping[str, Any]) -> Optional[SoloUpstreamError]:

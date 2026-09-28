@@ -2717,21 +2717,26 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
         len(body.get("tools") or []),
         sum(1 for m in (messages or []) if isinstance(m, Mapping) and m.get("role") == "tool"),
     )
-    gate = await trae_solo.account_gate(account_id)
+    # Cool-down gate instead of a semaphore: a leaked semaphore blocked every
+    # later call on the account (requests hung for the full timeout with
+    # upstream_ready=False).  See trae_solo._COOLDOWN_SECONDS.
+    cooling, left, reason = await trae_solo.account_cooling(account_id)
+    if cooling:
+        raise RuntimeError(
+            f"account {account_id} cooling down {int(left)}s ({reason})"
+        )
     client = httpx.AsyncClient(timeout=None)
     released = False
 
     async def release() -> None:
-        # The streaming response outlives this function: the HTTP client and the
-        # account gate must stay alive until the generator finishes consuming.
+        # The streaming response outlives this function: the HTTP client must
+        # stay alive until the generator finishes consuming.
         nonlocal released
         if released:
             return
         released = True
         await client.aclose()
-        gate.release()
 
-    await gate.acquire()
     try:
         event_iter = trae_solo.stream_events(client, token, user_id, body)
         if stream:
@@ -2793,14 +2798,20 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
                     yield openai_chunk(prefix_id, model, {}, finish_reason=final_reason)
                     yield "data: [DONE]\n\n"
                     stream_status = "completed"
+                    await trae_solo.clear_cooldown(account_id)
                 except asyncio.CancelledError:
                     stream_status = "client_cancelled"
                     raise
                 except GeneratorExit:
                     stream_status = "client_closed"
                     raise
-                except trae_solo.SoloUpstreamError:
+                except trae_solo.SoloUpstreamError as exc:
                     stream_status = "upstream_error"
+                    await trae_solo.cool_account(
+                        account_id,
+                        trae_solo.cooldown_kind_for(exc.code),
+                        str(exc)[:200],
+                    )
                     raise
                 except Exception:
                     stream_status = "error"
