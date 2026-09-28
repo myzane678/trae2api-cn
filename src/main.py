@@ -3663,6 +3663,11 @@ async def api_allowlist_post(req: Request):
 @app.get("/v1/models")
 async def models(request: Request):
     force = request.query_params.get("refresh", "").lower() in {"1", "true", "yes"}
+    # The console needs the full catalog to populate its picker; the allowlist
+    # only narrows what external API clients see.  Without this, a small
+    # allowlist would hide every other model from the console too, making the
+    # list impossible to grow back.
+    show_all = request.query_params.get("all", "").lower() in {"1", "true", "yes"}
     try:
         if UPSTREAM_MODE in ("solo", "solo-lite", "llm_utils_chat"):
             account_id = str(auth.get_active_account_id() or "default")
@@ -3679,12 +3684,12 @@ async def models(request: Request):
             items = await trae_client.get_models(force=force)
     except Exception as e:
         return _openai_error(502, str(e), "api_error")
-    if MODEL_ALLOWLIST:
+    if MODEL_ALLOWLIST and not show_all:
         seen = {}
         for entry in items:
             mid = str(entry.get("id", "")).strip()
             key = mid.lower()
-            if key not in MODEL_ALLOWLIST:
+            if key not in {m.lower() for m in MODEL_ALLOWLIST}:
                 continue
             if key not in seen or mid == key:
                 # one entry per allowlist id; prefer the exact lowercase form

@@ -805,7 +805,9 @@ async function refreshModels() {
   const btn = $('models-refresh');
   setBusy(btn, true);
   try {
-    const result = await requestJSON('/v1/models?refresh=1', { method: 'GET' }, 30000);
+    // all=1 returns the full catalog: the allowlist must not hide models from
+    // the picker, or the list can never be grown back.
+    const result = await requestJSON('/v1/models?refresh=1&all=1', { method: 'GET' }, 30000);
     const d = result.data;
     if (!result.ok || !d || !Array.isArray(d.data)) {
       showMsg('allow-msg', apiError(d, result.status), false);
