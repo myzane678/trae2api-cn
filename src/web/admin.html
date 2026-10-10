@@ -514,6 +514,41 @@ function fmtTime(ts) {
 }
 function fmtDur(ms) { return ms === undefined || ms === null ? '–' : (ms / 1000).toFixed(2) + 's'; }
 
+/* ── last-known dashboard cache ── */
+// The first paint must not wait on upstream probes: the console window opens
+// right after a cold relay start, when /api/checkin/accounts is at its
+// slowest. Remember the last good payloads in localStorage and render them
+// before the first fetch round returns.
+const CACHE_KEY = 'trae2api-dash-v1';
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function rememberCache(patch) {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+    Object.assign(c, patch, { date: todayKey(), at: Date.now() });
+    localStorage.setItem(CACHE_KEY, JSON.stringify(c));
+  } catch (e) { /* storage unavailable: first paint just stays as before */ }
+}
+function hydrateCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    if (!c) return;
+    const fresh = c.date === todayKey();
+    if (fresh && c.stats) { statsData = c.stats; renderOverview(); }
+    if (c.accounts) {
+      let d = c.accounts;
+      if (!fresh) {
+        // A new business day invalidates the cached checked-in flags; show the
+        // accounts and credits but keep the check-in button actionable.
+        d = { ...d, accounts: (d.accounts || []).map((a) => ({ ...a, checked_in: false, checkin: Object.assign({}, a.checkin, { checked_in: false }) })) };
+      }
+      paintAccounts(d);
+    }
+  } catch (e) { /* corrupt cache: fall through to the fetch round */ }
+}
+
 function showView(name) {
   document.querySelectorAll('.navitem[data-v]').forEach((n) => n.classList.toggle('active', n.getAttribute('data-v') === name));
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === 'view-' + name));
@@ -536,7 +571,7 @@ function card(i, k, v, s) {
 const PALETTE = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b'];
 
 async function loadStats() {
-  try { statsData = await api('/api/stats'); renderOverview(); } catch (e) { /* keep previous */ }
+  try { statsData = await api('/api/stats'); rememberCache({ stats: statsData }); renderOverview(); } catch (e) { /* keep previous */ }
 }
 let _ovSig = '';
 function renderOverview() {
@@ -602,10 +637,7 @@ function renderDist() {
 
 /* ── accounts ── */
 let _acctSig = '';
-async function loadAccounts(force) {
-  let d;
-  try { d = await api('/api/checkin/accounts' + (force ? '?fresh=1' : '')); }
-  catch (e) { $('accounts').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+function paintAccounts(d, force) {
   const accts = d.accounts || [];
   const active = accts.find((a) => a.id === d.active) || accts[0];
   lastOverview = Object.assign({}, lastOverview, { credits: null });
@@ -656,6 +688,19 @@ async function loadAccounts(force) {
   const b = $('btnCheckin');
   if (b) { b.disabled = allDone; b.classList.toggle('done', allDone); b.textContent = allDone ? '今日已全部签到' : '立即签到'; }
 }
+async function loadAccounts(force) {
+  let d;
+  try { d = await api('/api/checkin/accounts' + (force ? '?fresh=1' : '')); }
+  catch (e) { $('accounts').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  rememberCache({ accounts: d });
+  paintAccounts(d, force);
+}
+// A claim grants credits at the entitlement API, which nothing else in the
+// post-claim reload touches; without this pull the 可用积分 card keeps the
+// pre-claim number until the user clicks 刷新积分.
+async function refreshCreditsSilent() {
+  try { await api('/api/checkin/credits/accounts', null, 40000); } catch (e) { /* keep last known */ }
+}
 async function checkinOne(id, btn) {
   busy(btn, true);
   try {
@@ -663,13 +708,13 @@ async function checkinOne(id, btn) {
     if (d.success) toast(d.skipped ? '今日已签过到' : ('签到成功' + (d.claimed_credits != null ? '，本次 +' + d.claimed_credits : '')), true);
     else toast(d.error || '签到失败', false);
   } catch (e) { toast(String(e.message || e), false); }
-  finally { busy(btn, false); loadAccounts(true); loadCheckinHistory(); loadStats(); }
+  finally { busy(btn, false); await refreshCreditsSilent(); loadAccounts(true); loadCheckinHistory(); loadStats(); }
 }
 async function doCheckin(btn) {
   busy(btn, true);
   try { await post('/api/checkin/claim-all', {}, 90000); toast('批量签到完成，明细见签到记录', true); }
   catch (e) { toast(String(e.message || e), false); }
-  finally { busy(btn, false); loadAccounts(true); loadCheckinHistory(); loadStats(); }
+  finally { busy(btn, false); await refreshCreditsSilent(); loadAccounts(true); loadCheckinHistory(); loadStats(); }
 }
 async function switchAccount(id, btn) {
   busy(btn, true);
@@ -839,8 +884,8 @@ async function loadUsage(force) {
         <td class="mono">${fmtTime(r.timestamp)}</td>
         <td class="mono">${esc(r.model || '–')}</td>
         <td class="mono">${esc((r.endpoint || '').replace('/v1/', '') || '–')}</td>
-        <td>${ok ? '<span class="badge ok">完成</span>' : '<span class="badge bad">' + esc(r.status) + '</span>'}</td>
-        <td class="mono">${fmtTok(r.prompt_tokens)}</td>
+        <td>${ok ? '<span class="badge ok">完成</span>' : '<span class="badge bad">' + esc(r.status) + '</span>'}${r.truncated_suspect ? ' <span class="tag bad" title="长回复的最后一句停在词中间而非句号收尾，上游报 finish_reason=stop。上游计费 token 与实际收到的字数一致，即上游生成侧提前停笔，不是中转丢内容">结尾未完</span>' : ''}</td>
+        <td class="mono"${r.out_chars != null ? ` title="收到内容 ${r.out_chars} 字（不含思考）"` : ''}>${fmtTok(r.prompt_tokens)}</td>
         <td class="mono">${fmtTok(r.completion_tokens)}</td>
         <td class="mono">${r.credits_consumed != null ? '≈' + n2(r.credits_consumed) : '–'}</td>
         <td class="mono">${fmtDur(r.ttfb_ms)}</td>
@@ -1028,6 +1073,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && li
 (async function boot() {
   showView((location.hash || '#/overview').slice(2) || 'overview');
   $('accKey').textContent = FULL_API_KEY ? (FULL_API_KEY.slice(0, 12) + '…' + FULL_API_KEY.slice(-4)) : '(未设置)';
+  hydrateCache();
   await Promise.all([loadStatus(), loadStats(), loadAccounts(), loadCheckinHistory(), loadUsage(), loadAllowlist(), loadSettings()]);
   liveAt = Date.now();
   startLive();

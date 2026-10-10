@@ -1,45 +1,66 @@
 # Trae2api-cn（本地维护版）
 
-## 本地部署卡（2026-09-06）
+## 本地部署卡（2026-10-10）
 
 | 项 | 值 |
 |---|---|
-| 上游来源 | autumnsentiment/Trae2api-cn（Python/FastAPI，本地补丁见 CHANGELOG.md v1-v14） |
+| 上游来源 | autumnsentiment/Trae2api-cn（Python/FastAPI，本地补丁见 CHANGELOG.md v1-v30） |
 | 服务地址 | `http://127.0.0.1:8092/v1`（OpenAI Chat Completions 兼容 + Codex Responses API） |
 | 鉴权 | `Authorization: Bearer sk-trae-6a056f59f298f35f69f01772515f3316` |
 | 控制台 | `http://127.0.0.1:8092/web/login`（账号/积分/签到/白名单勾选/消费记录含首字耗时） |
 | 启停 | `start-trae2api.cmd`（8092 + 8765 助手）/ `stop-trae2api.cmd`，无窗口自关 |
 | 登录 | 控制台授权按钮（或 `start-trae2api-login.cmd` 先行）；token 自动续期 |
-| 白名单 | 控制台勾选管理（data/model-allowlist.json），默认 20 个可用模型；`/v1/models?all=1` 查完整目录 |
-| 工具调用 | ✅ SOLO 原生通道（v23）：请求体原生 `tools`/`tool_choice`，SSE `event:output.tool_calls` 结构化返回，标准 OpenAI 流式 `tool_calls` delta。`tool_choice=auto` 自然问法实测主动调工具，多轮 tool-result 续轮正常 |
-| 上游模式 | `UPSTREAM_MODE=solo`（唯一路由）：`llm_utils_chat` + `function=solo_work_lite`，`X-Ide-Version: 0.1.52` 解锁现役模型。旧的 remote/raw/web/ide/cli 通道已于 v25 删除（结论见 CHANGELOG） |
-| 模型 | 20 个主力（glm-5.x、DeepSeek-V4 系列、Doubao-Seed-2.x、kimi-k3、qwen3.8-max、minimax-m3、step-5-preview…），控制台勾选管理；费率/上下文窗口见「模型白名单」页 |
+| 白名单 | 控制台勾选管理（data/model-allowlist.json）；**不勾 = 放行全部**；`/v1/models?all=1` 查完整目录（当前 25 个） |
+| 工具调用 | ✅ SOLO 原生通道：请求体原生 `tools`/`tool_choice`，SSE `event:output.tool_calls` 结构化返回，标准 OpenAI 流式 `tool_calls` delta。**25 个模型全部实测通过**，含 3 工具并行调用（参数 JSON 合法、index 分组正确） |
+| 上游模式 | `UPSTREAM_MODE=solo`（唯一路由）：`llm_utils_chat` + `function=solo_work_lite`，`X-Ide-Version: 0.1.52` 解锁现役模型 |
+| 模型 | 25 个（glm-5.x、DeepSeek-V4 系列、Doubao-Seed-2.x、kimi-k3、qwen3.8-max、minimax-m3、step-5-preview、mimo-v2.6…），控制台勾选管理 |
 | 积分 | 全部为通用积分（Work 专属已升级合并，TraeCode/TraeWork 通吃），SOLO 通道消耗通用积分；实测费率 ≈ 0.09 分/千token（豆包） |
 | 并发 | 每账号信号量上限 5（`TRAE_SOLO_MAX_PARALLEL` 可调）+ 冷却状态机（429→60s、1005→12h、其他错误→10m，成功即解冻） |
-| 已知问题 | deepseek-v4.1-flash 上游固定排队 188-218s，不适合交互式使用（已移出默认白名单，需要时可加回）；auto 模型 id 不可用（用显式模型）；Work 通道（create_agent_task）加密字段锁在本地进程不可反代 |
+
+### 模型可用性实测（2026-10-10，25 个全测）
+
+**工具调用：25/25 全部通过**——这些模型在工具能力上无差异。
+
+**长文收尾：23 个正常，1 个反复截断。**
+
+| 模型 | 长文收尾 | 耗时 | 费率 | 备注 |
+|---|---|---|---|---|
+| `deepseek-v4.1-flash` | ❌ **4/4 截断** | 45s | 0.15 | **不要用**：长文结尾停在词中间（复测 3/3 一致） |
+| `mimo-v2.6-flash` | ✅ | 70s | 0.06 | 最便宜，思考链短（41-98 字） |
+| `step-5-preview` | ✅ | 32-84s | 0.48 | 综合稳定 |
+| `glm-5.3-flash` | ✅ | 138s | 0.06 | ⚠️ 思考链极长（单轮 2000+ 字），交互观感差 |
+| `glm-5.3-flashx` | ✅ | 29s | 0.31 | |
+| `kimi-k3` / `kimi-k2.7-code` / `kimi-k2.6` | ✅ | 27-87s | 0.75-1.83 | |
+| `DeepSeek-V4-Flash` / `-Official` | ✅ | 31-38s | 0.2 | 与 `deepseek-v4.1-flash` 是两个模型，这两个正常 |
+| `DeepSeek-V4-Pro` / `-Official` | ✅ | 57-120s | 0.72 | |
+| `qwen3.8-max` / `qwen-3.7-plus` | ✅ | 32-129s | 0.25-1.5 | |
+| `minimax-m3` | ✅ | 27s | 0.26 | |
+| `Doubao-Seed-2.x` 系列 | ✅ | 145-388s | 0.08-0.39 | 慢，但完整 |
+| `glm-5` / `glm-5.2` / `glm-5.3` / `glm-5-turbo` | ✅ | 67-284s | 0.7-0.78 | |
+
+**结论：唯一确认有缺陷的是 `deepseek-v4.1-flash`，长文必截断。选模型时避开它即可。**
+
+### 已知问题
+
+- **`deepseek-v4.1-flash` 长文截断**：4/4 复现，结尾停在词中间（无句号），`finish_reason=stop`。上游计费 token 与实际发出字数一致（1.67-1.72 chars/token，中文健康值），**不是中转丢内容，是模型生成侧提前停笔**。换 `function` 值不解决。控制台「请求日志」的「结尾未完」徽章可识别此类情况。
+- **`glm-5.3-flash` 思考链过长**：单轮思考可达 2000+ 字，期间正文零输出。zcode 不显示 `reasoning_content`（bundle 内 0 次出现），所以体感像"卡住不吐字"，实际是思考中。
+- **工具调用轮次正文为空是正常行为**：模型决定调工具时 `content=0` + `finish_reason=tool_calls`，正文要等工具结果回传后的下一轮才产生。
+- **路由器 DNS 污染（本机环境）**：`192.168.1.1` 把 `trae-api-cn.mchost.guru` 解析成 `127.0.0.1`，导致模型列表刷不出、请求超时。已在 `hosts` 固定为 `113.59.40.147`（备份 `hosts.bak-zcode-20261010`）。同后缀的 `api5-normal.mchost.guru` 不受影响。
+- auto 模型 id 不可用（用显式模型）；Work 通道（`create_agent_task`）加密字段锁在本地进程不可反代。
 
 **仅供学习使用。请勿用于商业用途。**
-
-> 以下为上游原 README。
 
 ## 特点
 
 - OpenAI 兼容接口：`GET /v1/models`、`POST /v1/chat/completions`、`POST /v1/responses`、`POST /v1/chat`、`POST /v1`
-- 流式与非流式输出
-- OpenAI `tools` / `tool_choice` / `parallel_tool_calls` 兼容，流式输出标准 `delta.tool_calls`
-- Codex Responses API 兼容：支持文本流、`function_call`、`custom_tool_call`、namespace 工具及 `*_call_output` 续轮
-- 调用方工具桥接：请求中声明的 Windows 工作区、Shell、读写和编辑工具由 API 调用方执行，relay 只转发调用与结果
-- 单一上游通道：SOLO `llm_utils_chat`（原生工具调用）。历史通道 raw/remote/web/ide/cli 已移除
-- 多账号管理：网页 UI 添加/切换/删除账号，round-robin 轮询
-- 网页 OAuth 登录：在浏览器中直接授权，无需手动抓取 JWT
-- 多账号轮询：每次请求自动切换到下一个有效账号，突破单账号并发限制
-- 账号并发控制：每账号最大 2 个并行会话（与上游一致），超限排队等待
-- 空闲会话回收：60 秒无活动的会话自动中断，释放并发槽位
-- 自动刷新 Cloud-IDE-JWT 令牌
-- 自动轮换设备指纹，降低 IDE 端点风控
-- 未知模型透传上游，无需为每个新模型改代码
-- 网页授权自动检测本机助手（方案 A：下载一次、双击即用）
-- Docker 一键部署
+- 流式与非流式输出，SSE 心跳防止网关空闲断开
+- 完整工具调用：`tools` / `tool_choice`（auto / none / required / 指定函数）/ `parallel_tool_calls`，流式输出标准 `delta.tool_calls`
+- Codex Responses API：文本流、`function_call`、`custom_tool_call`、namespace 工具、`*_call_output` 续轮
+- 单一上游通道：SOLO `llm_utils_chat`（原生工具调用）。历史通道 raw / remote / web / ide / cli 已移除
+- 多账号：网页 OAuth 登录、手动添加凭证、顺序轮询 / 积分优先轮询、每账号并发槽位与排队
+- 每日签到：一键签到、定时自动签到（北京时间）、9074 风控自动换设备 ID 并退避重试
+- 积分与消费记录：按请求记录 tokens、单次积分、状态、首字耗时、收到字数
+- 网页控制台：运行概览、账号池、模型白名单、请求日志、设置、连接测试
 
 ## 认证方式
 
@@ -48,110 +69,43 @@
 | `auto` | 自动解密本地 Trae CN / SOLO CN 的 `storage.json` |
 | `env` | 从 `.env` 读取 TRAE_TOKEN / TRAE_REFRESH_TOKEN / TRAE_USER_ID |
 | `manual` | 网页抓包得到的 Cloud-IDE-JWT |
-| `cli` | 本地 Trae CLI 子进程，不需要 JWT |
-| `web-login` | 浏览器授权登录，打开 `http://服务器:8000/web/login` 后在页面完成授权 |
+| `web-login` | 浏览器授权登录，打开 `http://服务器:端口/web/login` 后在页面完成授权 |
 
 ## 快速开始
 
 ```bash
 cp .env.example .env
-# 编辑 .env 配置 TRAE_AUTH_SOURCE 和上游模式
+# 编辑 .env 配置 TRAE_AUTH_SOURCE
 pip install -r requirements.txt
-uvicorn src.main:app --host 0.0.0.0 --port 8000
+uvicorn src.main:app --host 127.0.0.1 --port 8092
 ```
 
-开发环境使用 `pip install -r requirements-dev.txt`，Windows TraeWork native
-helper 使用 `pip install -r requirements-native.txt`。Linux relay 镜像只安装核心依赖。
+Windows 本机推荐用一键启动（零黑窗，含 OAuth 助手）：
 
-## Docker 部署
-
-```bash
-cp .env.example .env
-docker compose up -d --build
+```cmd
+start-trae2api.cmd
 ```
 
-容器默认监听 `8000` 端口，可通过 `RELAY_PORT` 环境变量修改。
-发布构建可设置 `RELAY_BUILD_REVISION=$(git rev-parse --short HEAD)`；该值会写入
-镜像 label，并由 `/v1/status` 返回，便于确认运行容器与源码版本一致。
-
-## 网页授权（推荐：web-login 模式）
-
-> **为什么需要一个本机助手？**
-> Trae 授权页强制要求授权回调地址为 `http://127.0.0.1:<端口>/authorize`，
-> 且浏览器网页出于安全沙箱无法监听本机 TCP 端口，因此必须由本机运行
-> 一个轻量监听器来接收回调并转发给服务器。**这是 Trae 的限制，不是本项目的缺陷。**
-
-### 首次使用（只需一次）
-
-1. 打开 `http://服务器:8000/web/login`
-2. 点击「使用 Trae 网页授权登录」，页面会自动检测本机助手是否在线
-3. 若提示「未检测到本机授权助手」，点击页面上的「下载一键启动 start_auth.bat」
-4. 双击运行 `start_auth.bat`（Windows，无需安装 Python 时会提示安装），保持窗口开启
-5. 回到页面重新点击授权，浏览器弹出 Trae 授权页，确认登录即可
-6. 凭据自动写入服务器，页面自动刷新显示「已登录」
-
-> 也可手动运行：`python web_login.py --relay http://服务器:8000`
-
-### 之后每次授权
-
-本机助手已在线时，直接点授权即可，无需重复下载和启动。
-
-### 助手端点
-
-- `GET http://127.0.0.1:8765/healthz` — 健康检查（供网页检测）
-- `GET http://127.0.0.1:8765/relay-url` — 返回配置的 relay 地址
+停止：`stop-trae2api.cmd`。
 
 ## 配置
 
-详见 `.env.example` 中的注释。
-
-关键变量：
+关键变量（完整列表见 `.env.example`）：
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `TRAE_AUTH_SOURCE` | `auto` | 认证来源 |
-| `UPSTREAM_MODE` | `remote` | 上游模式：remote 默认先用 `solo_agent_remote`，创建失败或首个模型事件前空响应时最多回退一次 `solo_work_remote`；其他兼容模式可显式选择 `raw` / `cli` / `web` / `ide` |
-| `TRAE_CHECKIN_DEVICE_ID` | 空 | 可选的 TraeWork 原生 `guaranteedDeviceId`；配置后签到优先使用真实客户端设备身份 |
-| `TRAE_CHECKIN_DEVICE_IDS_JSON` | 空 | 可选的账号到 TraeWork 设备 ID 的 JSON 映射，优先级高于全局设备 ID |
-| `TRAE_CHECKIN_INTERVAL_SECONDS` | `60` | 多账号轮询时相邻实际签到请求的间隔 |
-| `TRAE_CHECKIN_9074_RETRY_SECONDS` | `60` | 上游返回业务码 9074 后提示的最短重试等待时间；relay 不会立即重复 claim |
-| `TRAE_CHECKIN_9074_MAX_BACKOFF_SECONDS` | `3600` | 连续 9074 指数退避的等待上限（秒） |
-| `TRAE_CHECKIN_AUTO_RETRY_INTERVAL_SECONDS` | `60` | 后台自动错峰重试的扫描间隔（秒），到点自动 claim 冷却到期的账号 |
-| `TRAE_CONSOLE_ACCOUNT_TTL_SECONDS` | `120` | 控制台轮询账号接口时复用缓存探测结果的秒数；避免开着页面就变成对上游的持续探测。手动「刷新数据」和签到后的自动重载会绕过它强制探测 |
-| `TRAE_RAW_BASE_URL` | `https://trae-api-cn.mchost.guru` | Trae raw v2 `llm_raw_chat` 网关；账号站 `api.trae.com.cn` 不提供此模型端点 |
-| `TRAE_RAW_MAX_MESSAGES` | `80` | raw 请求保留的非系统历史消息上限；会保留最近连续历史及边界工具调用配对 |
-| `TRAE_RAW_MAX_HISTORY_CHARS` | `120000` | raw 历史文本字符上限，避免重复工具 schema 和过长历史造成额外消费 |
-| `TRAE_RAW_MAX_TOOL_SCHEMA_CHARS` | `48000` | raw 系统提示中的工具 schema 字符预算；超限时保留全部工具名并压缩为字段签名，减少输入积分消耗 |
-| `TRAE_REMOTE_ONLY_MODELS` | 空 | 仅将列出的显式模型强制送往 remote；逗号分隔，`*` 表示全部强制 remote |
-| `TRAE_REMOTE_MAX_MESSAGES` | `500` | remote 会话保留的非系统历史消息上限 |
-| `TRAE_REMOTE_MAX_HISTORY_CHARS` | `480000` | remote 历史文本字符上限（压缩阶段） |
-| `TRAE_REMOTE_QUERY_MAX_CHARS` | `480000` | remote 扁平化 query 的硬上限；上游超过约 500K 字符会静默结束事件流，超限时从最早的非系统消息开始裁剪 |
-| `TRAE_REMOTE_MAX_MODE` | `0` | remote 会话启用 1M Max 模式；对账号配置 `max_mode=true` 的模型注入 `strategy=max` 与 1M/936K/64K 参数，并使用独立的 max 会话 ID |
-| `TRAE_REMOTE_MAX_MODELS` | 空 | Max 模型白名单，逗号分隔；留空表示所有 `max_mode=true` 模型生效 |
-| `TRAE_REMOTE_MAX_MODE_TYPE` | `1` | 服务端 `get_model_selection_modes` 的模式枚举；`1` 已实测生效 |
-| `TRAE_REMOTE_AGENT_FIRST` | `1` | remote 是否默认锁定 Agent 执行器；关闭后普通请求直接使用 Work |
-| `TRAE_REMOTE_WORK_FALLBACK` | `1` | Agent 创建失败或可重试空响应时，是否同账号回退一次 Work |
-| `TRAE_REMOTE_CALLER_TOOLS_USE_WORK` | `1` | 带调用端工具的 remote 请求固定使用 Work，避免 Agent 内部远端工具把“已下载/已写入”误报为调用端本地文件操作；普通无工具请求仍默认 Agent |
-| `TRAE_CLIENT_WORKSPACE_PATH` | `C:\workspace` | 未传 `client_context` 时使用的调用方工作区 |
-| `TRAE_CLIENT_SYSTEM_TYPE` | `Windows` | 未传 `client_context` 时使用的调用方系统 |
-| `TRAE_CLI_DISALLOWED_TOOLS` | `Read,Bash,Edit,Replace,Write,Glob,Grep,Task` | CLI 模式额外禁用的 relay 本机工具；外部工具请求会与默认项合并 |
-| `TRAE_WEB_BASE_URL` | `https://trae-api-cn.mchost.guru/api/remote/v1` | remote 上游端点；`remote` 模式按 9router 的 `chat_sessions` + `events` 协议转发 |
-| `TRAE_WEB_PARALLEL_LIMIT` | `2` | 每账号最大并行会话数 |
-| `TRAE_WEB_IDLE_TIMEOUT` | `60` | 空闲会话回收超时（秒） |
-| `TRAE_REMOTE_FIRST_EVENT_TIMEOUT_SECONDS` | `120` | remote 会话创建成功但没有首个 SSE 事件时的重试等待；首事件前 EOF/读超时同样按可重试空响应处理，`0` 表示关闭独立首事件期限 |
-| `TRAE_FETCH_MODEL_LIST` | `false` | `/v1/models` 是否从上游拉取真实模型列表 |
-| `SSE_HEARTBEAT_SECONDS` | `1` | Chat/Responses 上游空窗时发送标准 SSE 注释心跳；`0` 为关闭 |
-| `TRAE_USAGE_RECORDS_PATH` | `data/usage_records.json` | 消费记录独立持久化文件，不改写 `data/accounts.json` |
-| `TRAE_USAGE_SESSION_QUERY` | `true` | 有上游回合 ID 时异步查询精确积分；失败自动回退账号快照差值 |
-| `TRAE_USAGE_API_HOST` | `https://api5-normal.mchost.guru` | TraeWork 商业用量查询主机，不与 entitlement API 混用 |
-| `TRAE_USAGE_QUERY_TIMEOUT_SECONDS` | `15` | 回合积分查询超时时间；只影响后台 enrichment |
-| `TRAE_USAGE_CREDIT_SETTLE_SECONDS` | `1` | 请求完成后等待上游积分账单落库再计算单次积分差值 |
-| `RESPONSES_SESSION_TTL_SECONDS` | `3600` | `previous_response_id` 会话缓存有效期（秒） |
-| `RESPONSES_SESSION_MAX_ENTRIES` | `1024` | Responses 进程内会话缓存最大条数 |
+| `UPSTREAM_MODE` | `solo` | 上游通道；本版仅支持 `solo`（`llm_utils_chat` + `function=solo_work_lite`） |
+| `TRAE_IDE_VERSION` | `0.1.52` | 客户端版本头，解锁现役模型；旧版本号报 4001 `param is invalid` |
+| `TRAE_MODEL_ALLOWLIST` | 空 | 逗号分隔的模型白名单；留空 = 放行全部。控制台「模型白名单」页读写 `data/model-allowlist.json`，**不勾任何项 = 放行全部** |
+| `TRAE_FETCH_MODEL_LIST` | `true` | 从上游拉真实模型目录（`get_detail_param`），关闭则用内置表 |
+| `TRAE_SOLO_MAX_PARALLEL` | `5` | 每账号并发上限；超限排队 |
+| `TRAE_MAX_COMPLETION_TOKENS` | `64000` | 单次输出 token 上限；Agent 模型最高 64K |
+| `TRAE_VERBOSE_REASONING` | 空 | 设为 `1` 输出完整思考链；默认只保留压缩后的关键结论 |
+| `SSE_HEARTBEAT_SECONDS` | `1` | 上游空窗时的 SSE 心跳间隔；`0` 为关闭 |
+| `TRAE_USAGE_RECORDS_PATH` | `data/usage_records.json` | 消费记录持久化文件 |
 | `RELAY_API_KEYS` | 空 | API 密钥鉴权（逗号分隔多个）；公网部署必须设置并配合 TLS |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
-
-控制台的“消费记录”按请求保存一行，包含输入/输出/总 tokens、单次消耗积分、请求状态和模型。积分优先级为：上游显式 usage、TraeWork 回合级 `credits_float`、同一账号请求前后的累计积分差值；无法安全归属时显示 `--`，不会把未知值伪装成 0。回合级查询使用上游 `reply_to_message_id/userMessageId`，不会把固定 raw 会话 UUID 当作计费键，也不会阻塞模型首帧。记录保存在独立的 `usage_records.json`，账号凭据仍只在 `accounts.json` 中维护。
 
 ## 工具调用
 
@@ -159,9 +113,8 @@ docker compose up -d --build
 
 ```json
 {
-  "model": "auto",
+  "model": "step-5-preview",
   "stream": false,
-  "session_id": "terminal-session-1",
   "messages": [{"role": "user", "content": "读取 README.md"}],
   "tools": [{
     "type": "function",
@@ -178,131 +131,76 @@ docker compose up -d --build
   "tool_choice": "auto",
   "parallel_tool_calls": true,
   "client_context": {
-    "workspace_path": "C:\\Users\\me\\project",
-    "system_type": "Windows 11",
-    "terminal_context": [{"shell": "PowerShell", "cwd": "C:\\Users\\me\\project"}]
+    "workspace_path": "A:\ClaudeWorkspace",
+    "system_type": "Windows 11"
   }
 }
 ```
 
-非流式响应使用 `message.content: null`、`message.tool_calls` 和 `finish_reason: "tool_calls"`；`function.arguments` 是 JSON 字符串。流式响应在 `delta.tool_calls` 中返回增量，客户端需要按 `index` / `id` 拼接，直到收到 `finish_reason: "tool_calls"`。
+非流式响应使用 `message.content: null`、`message.tool_calls` 和 `finish_reason: "tool_calls"`；`function.arguments` 是 JSON 字符串。流式响应在 `delta.tool_calls` 中返回增量，客户端按 `index` 拼接，直到收到 `finish_reason: "tool_calls"`。
 
-客户端收到 assistant 的 `tool_calls` 后，在自己的终端执行工具，再把原 assistant 消息和 `role: "tool"`、匹配的 `tool_call_id`（建议同时带 `name`）及执行结果一起发起下一轮请求。relay 本身不会执行请求中声明的外部工具，也不会自动拥有调用方文件系统；`client_context` 只是告诉模型真实环境，不能替代客户端工具实现。
+第二轮请求需带回完整历史（原 assistant 消息 + `role: "tool"` 结果 + 匹配的 `tool_call_id`），relay 会保持调用关联。
 
-第二轮请求需带回完整历史，例如：
-
-```json
-{
-  "model": "auto",
-  "session_id": "terminal-session-1",
-  "messages": [
-    {"role": "user", "content": "读取 README.md"},
-    {
-      "role": "assistant",
-      "content": null,
-      "tool_calls": [{
-        "id": "call_read_1",
-        "type": "function",
-        "function": {"name": "read_file", "arguments": "{\"path\":\"README.md\"}"}
-      }]
-    },
-    {
-      "role": "tool",
-      "tool_call_id": "call_read_1",
-      "name": "read_file",
-      "content": "README.md 的实际内容"
-    }
-  ],
-  "tools": [{
-    "type": "function",
-    "function": {
-      "name": "read_file",
-      "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}
-    }
-  }]
-}
-```
-
-`UPSTREAM_MODE=auto` 与 `UPSTREAM_MODE=raw` 的路由完全相同：Chat 与 Responses 请求都只发送到 `/api/ide/v2/llm_raw_chat`。raw HTTP body 固定为 `config_name`、`conversation_id`、`messages`、`model_name`、`session_id`、`stream` 六个字段；OpenAI `tools`、`tool_choice`、`parallel_tool_calls` 和工具历史不会作为顶层 raw 字段发送，而是由 relay 转成稳定的系统提示和不可执行历史，再把模型文本中的工具调用解析回 OpenAI 事件。
-
-每个账号与模型使用确定性的独立 raw 会话，并同时在 body 与 `Extra` 中绑定 `config_name` / `model_name`，避免缺失模型选择时回落到默认 provider。显式模型默认走 raw；只有 `TRAE_REMOTE_ONLY_MODELS` 中列出的模型才改走 remote，`*` 可作为诊断时的全量强制开关。
+**relay 不执行工具**：请求中声明的工具由 API 调用方执行，relay 只转发调用与结果。`client_context` 只告诉模型真实环境，不能替代客户端工具实现。
 
 ### 传输实现说明
 
-`remote` 模式复用了 9router Trae executor 的两步会话协议：先 `POST /chat_sessions` 创建回合，再 `GET /chat_sessions/{id}/events?reply_to_message_id=...` 读取 SSE。`plan_item.thought` 按累计快照计算增量，`token_usage`、`done` 和 `error` 会转换为现有 OpenAI Chat/Responses 输出。它只复用 9router 的转发逻辑，不切换到国际版；默认仍使用当前 CN remote 地址。
+`solo` 模式调用 `POST /api/agent/v3/llm_utils_chat`，请求体使用 Trae SOLO 原生字段 `function=solo_work_lite`，工具 `parameters` 按 Trae 协议序列化为 JSON 字符串，请求头使用 Cloud-IDE-JWT、设备指纹和生产流量标识（`trae_solo.solo_headers`）。
 
-`ide` 模式保留 trae2api 的 `/api/ide/v1/chat` 请求结构：稳定的 `session_id` / `conversation_id`、`chat_history`、`last_llm_response_info`、设备指纹和 Cloud-IDE-JWT 请求头。两种模式共用现有账号切换、token 快照、SSE 心跳、消费记录和 Responses 会话缓存。
+上游事件词汇表（实测）：`output`（承载 `response` / `reasoning_content` / `tool_calls`）、`token_usage`、`done`、`metadata`、`timing_cost`、`extra_info`（模型原始思考链 JSON，relay 忽略）、`progress_notice`（排队/处理中）、`error`。
 
-raw 模式不会向上游发送其不接受的 OpenAI 顶层工具字段，也不会在空响应后伪造占位正文。只有在首个模型事件出现前允许一次空响应重试；已有输出、provider、usage 或工具事件后不会重放请求，避免重复消费。`GET /v1/status` 的 `tool_execution` 固定为 `client`，并列出当前工具桥接能力。
+## 思考内容与思考强度
 
-`UPSTREAM_MODE=cli` 仅作为显式兼容模式保留，会禁用默认工具并合并 `TRAE_CLI_DISALLOWED_TOOLS`；`auto` 不会进入该路径。
+思考内容默认不对外输出到正文，通过 `reasoning_content` 字段分离返回。请求带 `thinking: {"type": "enabled"}`（或 `include_reasoning: true`）时返回 `reasoning_content`，正文 `content` 中不会出现思考文本。`TRAE_VERBOSE_REASONING=1` 可恢复完整思考链。
 
-工具调用属于不可信模型输出。客户端应校验工具名 allowlist 和 JSON schema，并对路径、命令、权限、超时及输出大小做限制。提示词、`client_context`、工具 schema 和工具结果都会发送给 relay/Trae 上游，敏感内容仍需在调用端裁剪。
+**注意**：部分客户端（如 zcode）不识别 `reasoning_content` 字段，思考内容对用户不可见但照常计费。模型在调工具前通常先思考一大段，此时正文为空——看起来像"卡住不吐字"，实际是思考中。
 
-## Codex Responses API
+## 消费记录与截断取证
 
-Codex 使用 `POST /v1/responses`，不能只把 `wire_api` 改成 Responses 后继续返回 Chat Completions SSE。relay 会把 Responses 的 `input`、扁平 function、自定义工具和 namespace 工具转换到现有 raw/CLI 工具管线，再返回带类型的 Responses 事件。
+控制台「请求日志」按请求保存一行，包含模型、tokens、单次积分、状态、首字耗时（TTFB）、总耗时。积分优先级为：上游显式 usage、TraeWork 回合级 `credits_float`、同一账号请求前后的累计积分差值；无法安全归属时显示 `--`。
 
-流式工具轮次会依次包含完整的 `response.output_item.done` 和 `response.completed`。Codex 收到当前响应完成后，才会在调用方终端执行工具，并用相同 `call_id` 加入 `function_call_output` 或 `custom_tool_call_output`，自动发起下一次 `/v1/responses` 请求。Responses 流不使用 Chat Completions 的 `data: [DONE]` 作为完成信号。
+**「结尾未完」徽章**：长回复（≥200 字）在 `finish_reason=stop` 下，若最后一行以词字符结尾（而非句号等收尾符），或整行只有破折号，判定为「结尾未完」。工具调用轮次不参与判定（正文天然极短）。判定依据是**结尾形态**，不是 token/字符比值——实测上游计费 token 与实际发出字数一致（1.67-1.72 chars/token），不存在「生成了却扣着不发」。
 
-Codex 自定义 provider 示例：
+## 使用注意事项
 
-```toml
-model_provider = "trae-relay"
-model = "glm-5.3"
-
-[model_providers.trae-relay]
-base_url = "http://服务器:8000/v1"
-wire_api = "responses"
-requires_openai_auth = true
-```
-
-若前面还有 new-api，应确保其 Responses 渠道把 `/v1/responses` 原样转发到本 relay；relay 地址自身则是 `http://服务器:8000/v1`。
-
-relay 支持两种连续会话方式：客户端可以在每轮重放完整 `input` 历史，也可以只发送新的输入或工具结果并携带上一轮返回的 `previous_response_id`。后一种方式会从有 TTL 和容量上限的进程内缓存恢复用户消息、assistant 输出、工具调用及绑定；客户端即使同时重放完整历史也会进行重叠去重。`store: false` 不写入缓存，未知、过期、容器重启后失效或超过缓存上限的 response id 会返回明确的 `400 previous_response_id` 错误。
-
-## 网页管理界面
-
-启动后访问 `http://服务器:8000/web/login`：
-
-- 状态查看
-- 账号列表管理（切换 / 删除）
-- 多账号轮询开关
-- 自定义上游 URL 和端口
-- 手动添加凭证
-- 登出
-- 获取模型列表：一键刷新 `/v1/models`（`TRAE_FETCH_MODEL_LIST=true` 时从上游拉取）
+- **网络边界**：本项目设计为内网部署。不要把端口直接暴露到公网；如必须公网访问，请设置 `RELAY_API_KEYS` 并加 TLS 反代。
+- **敏感数据**：`.env` 与 `data/`（`accounts.json`、`usage_records.json`）包含 JWT、刷新令牌和账号信息，已在 `.gitignore` 中排除，切勿提交或分享。
+- **端点选择**：本版只有 `solo` 一条通道。`solo` 与上游 README 所称的 `ide` 通道**是同一个东西**（同一端点路径、同一 `function` 值），不存在「换到 IDE Agent 更好」这个选项。
+- **工具执行在调用端**：relay 只转发工具调用和结果。模型声称"已下载 / 已写入"但本地没有文件，说明客户端没有真正执行工具。
+- **并发**：每账号默认 5 个并行会话，槽位全满时排队。并发过高会触发上游限流（1005 / 429），账号进入冷却。
+- **签到 9074**：9074 是上游风控码。relay 会自动轮换签到设备 ID 并指数退避重试；若长期失败，可在 `TRAE_CHECKIN_DEVICE_IDS_JSON` 中填入真实客户端的设备 ID。
+- **合规**：使用本项目需自行承担账号风险，请遵守 Trae 服务条款。
 
 ## 项目结构与运维
 
-正式可部署源码只有以下边界：
-
 ```text
 src/                    relay 服务与协议转换
+  main.py               路由、SOLO 调度、网页控制台 API、签到与消费记录
+  trae_solo.py          SOLO llm_utils_chat 协议、请求头、SSE 解析、模型目录
+  sse.py                SSE 转换、思考分离与工具调用解析
+  responses_api.py      Responses API 转换与会话缓存
+  auth.py               账号存储、OAuth、令牌刷新
+  model_limits.py       输出 token 上限钳制
+  web/admin.html        控制台前端（独立文件，避免 f-string 转义坑）
+tools/oneclick.py       Windows 零黑窗一键启动核心
 tests/                  离线协议、流式和路由回归测试
-native/                 TraeWork native 文件清单与说明，不包含 DLL
-tools/                  Windows native helper
-scripts/backup_runtime.sh  Docker 运行态一致性备份
+launch.vbs              桌面快捷方式入口（隐藏启动）
+start-trae2api.cmd      控制台入口
+stop-trae2api.cmd       停止服务
 ```
-
-探针、抓包、逆向材料、账号状态、旧发布包和备份不进入 Docker 构建上下文，
-也不应提交到仓库。`trae-cn-relay` 是唯一产品源码目录；研究目录只用于生成报告或补丁。
 
 发布前运行：
 
 ```bash
 python -m pytest -q
-docker compose build
 ```
 
-在 Docker 主机上备份当前运行容器、容器内源码、宿主配置和数据：
+控制台前端改动后建议额外做一次 JS 语法检查（历史上 f-string 转义曾导致整块 script 解析失败、所有按钮失效）：
 
 ```bash
-sudo bash scripts/backup_runtime.sh
+python -c "import sys;sys.path.insert(0,'.');from src import main;open('.tmp/admin.html','w',encoding='utf-8').write(main._web_login_html())"
+node --check .tmp/admin.js   # 抽出 <script> 块后检查
 ```
-
-脚本会短暂停止并自动重启容器，备份写入 `backups/<timestamp>-runtime/`，
-同时生成镜像归档和 SHA-256 校验清单。`.env` 与 `data` 含敏感状态，备份目录权限为 `0700`，文件为 `0600`。
 
 ## 开源协议
 

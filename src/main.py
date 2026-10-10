@@ -1825,6 +1825,8 @@ class _UsageTracker:
         self.usage_turn_id = ""
         self.saw_usage = False
         self.status = "in_progress"
+        self.truncated_suspect = False
+        self.out_chars: int | None = None
         self._finished = False
         self._credit_snapshot_started = bool(
             self.account_id and self.account_id != "default" and self.token
@@ -1934,6 +1936,8 @@ class _UsageTracker:
             duration_ms=round((time.perf_counter() - self.started) * 1000, 1),
             ttfb_ms=self.first_token_ms,
             tokens_source="upstream" if self.saw_usage else "unknown",
+            truncated_suspect=self.truncated_suspect,
+            out_chars=self.out_chars,
         )
         if explicit_credits is not None:
             try:
@@ -2665,6 +2669,90 @@ def _attach_solo_credit_estimate(usage: Any, model: str) -> None:
     usage["credits_source"] = "estimated"
 
 
+# Direct-to-gateway captures (bypassing this relay) show the real failure mode
+# for long answers: the model stops mid-sentence while the stream still closes
+# with a clean ``finish_reason=stop``, and the billed completion_tokens match
+# the delivered text (1.69 visible chars/token on Chinese, i.e. nothing is
+# withheld server-side). The signature is therefore the *ending*, not a
+# token/character mismatch: a finished answer ends on sentence punctuation or a
+# closing delimiter, a cut-off one ends on a word.
+_SOLO_TAIL_MIN_TEXT_CHARS = 200
+# Acceptable final characters: sentence punctuation, closing brackets/quotes,
+# and code-ish closers. A tail inside a fenced code block normally ends on one
+# of these, so code answers do not trip the check.
+_ANSWER_END_CHARS = set("。！？!?…；;」』）)】”\"'`]}》>|")
+# A markdown list item or heading is a legitimate punctuation-free ending.
+_ANSWER_STRUCTURAL_LINE_RE = re.compile(r"^(?:[-*+]\s|\d+[.)]\s|#{1,6}\s)")
+# A line consisting only of dashes is an unterminated em-dash opener: Chinese
+# prose continues after ``——``. Observed on a live cut that stopped right after
+# the closing line had started.
+_ANSWER_DASH_ONLY_RE = re.compile(r"^[—–]+$")
+_ANSWER_WORD_TAIL_RE = re.compile(r"[0-9A-Za-z\u4e00-\u9fff]$")
+
+
+def _solo_answer_looks_cut(tail: str) -> bool:
+    """True when a long answer ends mid-word instead of on punctuation.
+
+    Every observed cut-off ends on a word character (``…扮演愈发关键``,
+    ``…持续校准中向前``) or on a bare dash run where the closing line was
+    abandoned; complete answers end on a terminator.
+    """
+    stripped = tail.rstrip()
+    if not stripped:
+        return False
+    last = stripped[-1]
+    if last in _ANSWER_END_CHARS:
+        return False
+    last_line = stripped.rsplit("\n", 1)[-1].strip()
+    if _ANSWER_STRUCTURAL_LINE_RE.match(last_line):
+        return False
+    if _ANSWER_DASH_ONLY_RE.match(last_line):
+        return True
+    return bool(_ANSWER_WORD_TAIL_RE.search(last))
+
+
+def _flag_solo_truncation(
+    request_id: str,
+    model: str,
+    usage: Any,
+    text_chars: int,
+    reasoning_chars: int,
+    *,
+    tail: str = "",
+    has_tool_calls: bool = False,
+    finish_reason: str = "",
+    stream: bool = True,
+) -> None:
+    """Record visible output size and mark a mid-sentence ending.
+
+    Tool-calling turns legitimately carry almost no prose (the answer is the
+    call itself), so they are never candidates; a natural ``stop`` is required
+    so an explicit ``length`` stop is not double-reported.
+    """
+    tracker = _USAGE_TRACKER.get()
+    if tracker is not None:
+        tracker.out_chars = text_chars
+    if has_tool_calls or text_chars < _SOLO_TAIL_MIN_TEXT_CHARS:
+        return
+    if finish_reason and finish_reason != "stop":
+        return
+    if not _solo_answer_looks_cut(tail):
+        return
+    logger.warning(
+        "solo stream ends mid-sentence id=%s model=%s stream=%s "
+        "completion_tokens=%s text_chars=%d reasoning_chars=%d tail=%r",
+        request_id,
+        model,
+        stream,
+        (usage or {}).get("completion_tokens"),
+        text_chars,
+        reasoning_chars,
+        tail[-60:],
+    )
+    if tracker is not None:
+        tracker.truncated_suspect = True
+
+
 async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] = None):
     """SOLO ``llm_utils_chat`` channel: native tools and structured tool_calls.
 
@@ -2749,6 +2837,10 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
                 final_reason = "stop"
                 chunk_count = 0
                 tool_chunk_count = 0
+                text_chars = 0
+                reasoning_chars = 0
+                tail_buffer: list[str] = []
+                tail_chars = 0
                 started_at = time.monotonic()
                 stream_status = "running"
                 try:
@@ -2759,10 +2851,16 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
                             response = data.get("response")
                             if isinstance(response, str) and response:
                                 chunk_count += 1
+                                text_chars += len(response)
+                                tail_buffer.append(response)
+                                tail_chars += len(response)
+                                while tail_chars > 240 and len(tail_buffer) > 1:
+                                    tail_chars -= len(tail_buffer.pop(0))
                                 yield openai_chunk(prefix_id, model, {"content": response})
                             reasoning = data.get("reasoning_content")
                             if isinstance(reasoning, str) and reasoning:
                                 chunk_count += 1
+                                reasoning_chars += len(reasoning)
                                 yield openai_chunk(
                                     prefix_id, model, {"reasoning_content": reasoning}
                                 )
@@ -2793,6 +2891,16 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
                             )
                     if accumulator.has_calls:
                         final_reason = "tool_calls"
+                    _flag_solo_truncation(
+                        request_id,
+                        model,
+                        usage,
+                        text_chars,
+                        reasoning_chars,
+                        tail="".join(tail_buffer),
+                        has_tool_calls=accumulator.has_calls,
+                        finish_reason=final_reason,
+                    )
                     if FORWARD_USAGE and usage:
                         usage_chunk = openai_chunk(prefix_id, model, {}, usage=usage)
                         _track_usage_from_chunk(usage_chunk, model)
@@ -2837,6 +2945,7 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
         # Non-streaming: aggregate one chat.completion from the same events.
         accumulator = ToolCallAccumulator()
         text_parts: list[str] = []
+        reasoning_chars = 0
         usage = None
         final_reason = "stop"
         async for event, data in event_iter:
@@ -2845,6 +2954,9 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
                 response = data.get("response")
                 if isinstance(response, str) and response:
                     text_parts.append(response)
+                reasoning = data.get("reasoning_content")
+                if isinstance(reasoning, str) and reasoning:
+                    reasoning_chars += len(reasoning)
                 raw_calls = data.get("tool_calls")
                 if isinstance(raw_calls, list) and raw_calls:
                     accumulator.add(raw_calls)
@@ -2865,6 +2977,17 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
                 )
         if accumulator.has_calls:
             final_reason = "tool_calls"
+        _flag_solo_truncation(
+            request_id,
+            model,
+            usage,
+            sum(len(part) for part in text_parts),
+            reasoning_chars,
+            tail="".join(text_parts),
+            has_tool_calls=accumulator.has_calls,
+            finish_reason=final_reason,
+            stream=False,
+        )
         result = openai_completion(
             make_id(),
             model,
@@ -2925,6 +3048,12 @@ def _normalize_usage_record(record: Mapping[str, Any]) -> dict[str, Any]:
             "status": str(record.get("status") or "completed"),
             "duration_ms": _number_value(record.get("duration_ms")),
             "ttfb_ms": _number_value(record.get("ttfb_ms")),
+            "truncated_suspect": bool(record.get("truncated_suspect")),
+            "out_chars": (
+                int(record["out_chars"])
+                if isinstance(record.get("out_chars"), (int, float))
+                else None
+            ),
             "timestamp": _number_value(record.get("timestamp")) or 0,
         }
     )
@@ -2985,6 +3114,8 @@ def _record_usage(
     duration_ms: int | float | None = None,
     ttfb_ms: int | float | None = None,
     tokens_source: str = "upstream",
+    truncated_suspect: bool = False,
+    out_chars: int | None = None,
 ) -> dict[str, Any]:
     """Record one API request (newest first) and persist it independently."""
     global _USAGE_HISTORY
@@ -3004,6 +3135,8 @@ def _record_usage(
             "status": status,
             "duration_ms": duration_ms,
             "ttfb_ms": ttfb_ms,
+            "truncated_suspect": truncated_suspect,
+            "out_chars": out_chars,
             "timestamp": time.time(),
         }
     )
@@ -5006,6 +5139,9 @@ async def api_stop():
     async def _run_stop():
         await asyncio.sleep(0.5)
         try:
+            # CREATE_NO_WINDOW: the relay runs windowless (pythonw), so a bare
+            # powershell child would allocate a visible console mid-shutdown.
+            flags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
             proc = await asyncio.create_subprocess_exec(
                 "powershell",
                 "-NoProfile",
@@ -5015,6 +5151,7 @@ async def api_stop():
                 script,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
+                creationflags=flags,
             )
             await proc.wait()
         except Exception as exc:  # best-effort shutdown

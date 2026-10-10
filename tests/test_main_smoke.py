@@ -1633,6 +1633,150 @@ class UsageRecordTests(unittest.TestCase):
         self.assertIn("_acctSig", html)
         self.assertIn("_logSig", html)
 
+    def test_rendered_console_shows_truncation_forensics(self):
+        # The console request log must surface the cut-off forensics so a
+        # "the reply feels cut off" report can be attributed from the UI, and
+        # the tooltip must not claim the relay lost content: captures show the
+        # gateway stops generating while billing exactly what it sent.
+        html = main_module._web_login_html()
+        self.assertIn("truncated_suspect", html)
+        self.assertIn("结尾未完", html)
+        self.assertIn("上游生成侧提前停笔", html)
+
+
+class SoloTruncationForensicsTests(unittest.TestCase):
+    def _tracker(self):
+        return main_module._UsageTracker(
+            model="step-5-preview",
+            endpoint="/v1/chat/completions",
+            stream=True,
+            options={},
+        )
+
+    def _flag(self, tracker, usage, text_chars, reasoning_chars, **kwargs):
+        token = main_module._USAGE_TRACKER.set(tracker)
+        try:
+            main_module._flag_solo_truncation(
+                "req-test",
+                "step-5-preview",
+                usage,
+                text_chars,
+                reasoning_chars,
+                **kwargs,
+            )
+        finally:
+            main_module._USAGE_TRACKER.reset(token)
+
+    def test_healthy_ending_is_not_flagged(self):
+        # A long answer ending on sentence punctuation is complete. Billed
+        # tokens matching the delivered text (measured 1.69 chars/token) is the
+        # healthy case, so a token/char ratio must not decide this.
+        tracker = self._tracker()
+        self._flag(
+            tracker,
+            {"completion_tokens": 2000},
+            2600,
+            600,
+            tail="…这条从追赶到领跑的道路，正是中国高铁最值得被记录的发展逻辑。",
+            finish_reason="stop",
+        )
+        self.assertFalse(tracker.truncated_suspect)
+        self.assertEqual(tracker.out_chars, 2600)
+
+    def test_mid_sentence_ending_is_flagged(self):
+        # Captured failure: the model stops on a word while the stream still
+        # closes with a clean finish_reason=stop.
+        tracker = self._tracker()
+        self._flag(
+            tracker,
+            {"completion_tokens": 7242},
+            7527,
+            5511,
+            tail="…并在全球轨道交通格局中扮演愈发关键",
+            finish_reason="stop",
+        )
+        self.assertTrue(tracker.truncated_suspect)
+        asyncio.run(tracker.finish("completed"))
+        record = next(
+            r
+            for r in main_module._USAGE_HISTORY
+            if r.get("request_id") == tracker.request_id
+        )
+        self.assertTrue(record["truncated_suspect"])
+        self.assertEqual(record["out_chars"], 7527)
+
+    def test_tool_calling_turn_is_never_flagged(self):
+        # A tool turn's answer is the call itself; a few characters of prose is
+        # normal and must not be reported as a cut-off reply.
+        tracker = self._tracker()
+        self._flag(
+            tracker,
+            {"completion_tokens": 1089},
+            40,
+            315,
+            tail="我来读取这个文件",
+            has_tool_calls=True,
+            finish_reason="tool_calls",
+        )
+        self.assertFalse(tracker.truncated_suspect)
+        self.assertEqual(tracker.out_chars, 40)
+
+    def test_short_replies_never_flagged(self):
+        # Below the length floor an ending-on-a-word is ordinary (one-line
+        # replies, numbers, paths), so the check stays off.
+        tracker = self._tracker()
+        self._flag(tracker, {"completion_tokens": 200}, 10, 0, tail="好的")
+        self.assertFalse(tracker.truncated_suspect)
+        self.assertEqual(tracker.out_chars, 10)
+
+    def test_explicit_length_stop_is_not_double_reported(self):
+        # finish_reason=length is already surfaced to the caller; the forensics
+        # flag is reserved for silent cut-offs that still claim a normal stop.
+        tracker = self._tracker()
+        self._flag(
+            tracker,
+            {"completion_tokens": 8000},
+            9000,
+            0,
+            tail="…内容还在继续",
+            finish_reason="length",
+        )
+        self.assertFalse(tracker.truncated_suspect)
+
+    def test_code_answer_ending_on_closer_is_not_flagged(self):
+        tracker = self._tracker()
+        self._flag(
+            tracker,
+            {"completion_tokens": 1500},
+            3000,
+            0,
+            tail="    return result\n```",
+            finish_reason="stop",
+        )
+        self.assertFalse(tracker.truncated_suspect)
+
+
+class RenderedConsoleCacheTests(unittest.TestCase):
+    def test_rendered_console_hydrates_cache_and_refreshes_credits_after_claim(self):
+        # First paint must come from the localStorage cache (the console window
+        # opens right after a cold relay start, when account probes are
+        # slowest), and a claim must pull entitlement credits afterwards -
+        # nothing else in the post-claim reload touches the credits API.
+        html = main_module._web_login_html()
+        self.assertIn("function rememberCache(", html)
+        self.assertIn("function hydrateCache(", html)
+        boot = html.index("(async function boot(")
+        # Hydration paints before the first fetch round, not after it.
+        self.assertLess(html.index("hydrateCache();", boot), html.index("await Promise.all", boot))
+        self.assertLess(html.index("loadAccounts(true)"), boot)
+        # Both claim paths (single + bulk) refresh credits before reloading.
+        for fn in ("async function checkinOne(", "async function doCheckin("):
+            start = html.index(fn)
+            end = html.index("async function ", start + 10)
+            body = html[start:end]
+            self.assertIn("await refreshCreditsSilent();", body)
+            self.assertIn("loadAccounts(true)", body)
+
 
 class _FakeUsageTracker:
     def __init__(self):
