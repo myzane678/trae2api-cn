@@ -1,7 +1,9 @@
 @echo off
 REM start-trae2api-login.cmd - run OAuth local helper on 127.0.0.1:8765 (needed for web login callback)
 setlocal
-set PROJ=A:\ClaudeWorkspace\trae2api-cn
+cd /d "%~dp0"
+set PROJ=%~dp0
+if "%PROJ:~-1%"=="\" set PROJ=%PROJ:~0,-1%
 set PY=%PROJ%\.venv\Scripts\python.exe
 
 netstat -ano | findstr /c:":8765" | findstr /c:"LISTENING" >nul 2>&1

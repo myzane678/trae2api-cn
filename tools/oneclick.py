@@ -89,6 +89,9 @@ def spawn_service(script_args, log_name):
 
 def main():
     global VENV_HOME
+    # --no-open: ensure services only, do not touch the console window.
+    # The watchdog uses this so a respawn never steals focus or stacks windows.
+    no_open = "--no-open" in sys.argv[1:]
     VENV_HOME = read_venv_home()
     if not os.path.isfile(os.path.join(BASE, ".venv", "Scripts", "pythonw.exe")):
         log("[trae2api] python venv not found: .venv\\Scripts\\pythonw.exe")
@@ -124,6 +127,9 @@ def main():
         log("[trae2api] FAILED: relay did not become healthy within 20s. Check data\\relay-stderr.log")
         return 1
     log("[trae2api] relay healthy.")
+
+    if no_open:
+        return 0
 
     # Console in a Chrome app window (frameless, isolated profile). The marker
     # flag survives on the command line so stop-trae2api-helper.ps1 can close

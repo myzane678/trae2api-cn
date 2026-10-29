@@ -3346,13 +3346,21 @@ class MainCliSmokeTests(unittest.TestCase):
     def test_web_login_usage_panel_is_below_account_list(self):
         response = self.client.get("/web/login")
         self.assertEqual(response.status_code, 200)
-        # Sidebar navigation order: accounts before usage, usage before settings.
+        # Sidebar is grouped into 监控 / 资源 / 服务: the monitoring group
+        # (overview, logs, conn) comes first, then the resource group
+        # (accounts, models, settings). Service actions live in the footer.
         nav = response.text
-        account_index = nav.index('data-v="accounts"')
+        overview_index = nav.index('data-v="overview"')
         logs_index = nav.index('data-v="logs"')
         conn_index = nav.index('data-v="conn"')
-        self.assertLess(account_index, logs_index)
+        account_index = nav.index('data-v="accounts"')
+        models_index = nav.index('data-v="models"')
+        settings_index = nav.index('data-v="settings"')
+        self.assertLess(overview_index, logs_index)
         self.assertLess(logs_index, conn_index)
+        self.assertLess(conn_index, account_index)
+        self.assertLess(account_index, models_index)
+        self.assertLess(models_index, settings_index)
         # Usage keeps its own view and rendering table.
         self.assertIn('id="view-logs"', nav)
         self.assertIn('id="logBody"', nav)

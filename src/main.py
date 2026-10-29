@@ -100,7 +100,19 @@ MODEL_ALLOWLIST: set[str] = {
     for m in os.environ.get("TRAE_MODEL_ALLOWLIST", "").split(",")
     if m.strip()
 }
+# Per-account allowlists. An entry here wins over the global set for that
+# account; an account without one falls back to the global list, so existing
+# single-account deployments behave exactly as before.
+ACCOUNT_ALLOWLISTS: dict[str, set[str]] = {}
 ALLOWLIST_PATH = os.path.join("data", "model-allowlist.json")
+
+
+def allowlist_for(account_id: str = "") -> set[str]:
+    """Effective allowlist for one account ("" -> global)."""
+    key = str(account_id or "")
+    if key and key in ACCOUNT_ALLOWLISTS:
+        return set(ACCOUNT_ALLOWLISTS[key])
+    return set(MODEL_ALLOWLIST)
 
 
 def _load_allowlist_file() -> None:
@@ -115,6 +127,14 @@ def _load_allowlist_file() -> None:
             MODEL_ALLOWLIST.update(
                 str(m).strip().lower() for m in ids if str(m).strip()
             )
+        # Per-account section is optional; older files have only a flat list.
+        if isinstance(payload, dict) and isinstance(payload.get("accounts"), Mapping):
+            ACCOUNT_ALLOWLISTS.clear()
+            for aid, values in payload["accounts"].items():
+                if isinstance(values, list):
+                    ACCOUNT_ALLOWLISTS[str(aid)] = {
+                        str(m).strip().lower() for m in values if str(m).strip()
+                    }
     except (OSError, ValueError):
         pass
 
@@ -122,8 +142,12 @@ def _load_allowlist_file() -> None:
 def _save_allowlist_file() -> None:
     try:
         os.makedirs(os.path.dirname(ALLOWLIST_PATH) or ".", exist_ok=True)
+        payload = {
+            "ids": sorted(MODEL_ALLOWLIST),
+            "accounts": {aid: sorted(ids) for aid, ids in ACCOUNT_ALLOWLISTS.items()},
+        }
         with open(ALLOWLIST_PATH, "w", encoding="utf-8") as fh:
-            json.dump(sorted(MODEL_ALLOWLIST), fh, ensure_ascii=False, indent=2)
+            json.dump(payload, fh, ensure_ascii=False, indent=2)
     except OSError:
         pass
 
@@ -326,6 +350,8 @@ PUBLIC_PATHS = {
     "/api/accounts",
     "/api/accounts/switch",
     "/api/accounts/remove",
+    "/api/accounts/api-key",
+    "/api/api-keys",
     "/api/settings",
     "/api/polling",
     "/api/polling-mode",
@@ -1229,14 +1255,90 @@ async def _reap_idle_chat_sessions() -> int:
         return before - len(_UPSTREAM_SESSION_LEASES)
 
 
+class _PinnedAccountError(RuntimeError):
+    """A key-bound account cannot serve this request; do not fall back."""
+
+
+def _bind_pinned_account(messages: list[dict], options: dict, account_id: str) -> dict:
+    """Pin one request to an account chosen by its API key.
+
+    No rotation, no fallback: if this account is missing, token-less, cooling
+    down, or rate-limited the caller gets an error naming the account so they
+    can switch keys themselves. Substituting another account here would bill
+    quota the key holder never agreed to.
+    """
+    record = auth.get_account_record(account_id)
+    if not record:
+        raise _PinnedAccountError(
+            f"API key is bound to account {account_id}, which no longer exists. "
+            "Remove the key or bind it to a valid account."
+        )
+    token = str(record.get("token") or "").strip()
+    if not token:
+        raise _PinnedAccountError(
+            f"account {account_id} has no usable token; re-authorise it in the console"
+        )
+    now = time.monotonic()
+    with _CHAT_SESSION_LOCK:
+        _prune_chat_sessions(now)
+        session_id = str(options.get("session_id") or options.get("sessionId") or "").strip()
+        if not session_id:
+            session_id = uuid_mod.uuid4().hex
+        lease = _UPSTREAM_SESSION_LEASES.get(session_id)
+        # A session created while the key pointed elsewhere must not keep the
+        # old account: the binding follows the key, not the conversation.
+        if lease is None or lease.account_id != account_id:
+            billing_id = _account_id_from_token(token) or account_id
+            lease = _UpstreamSessionLease(
+                account_id=account_id,
+                billing_id=billing_id,
+                auth_token=token,
+                last_client_activity=now,
+                provider_specific=dict(
+                    record.get("provider_specific")
+                    or record.get("providerSpecificData")
+                    or {}
+                ),
+            )
+            _UPSTREAM_SESSION_LEASES[session_id] = lease
+        else:
+            lease.last_client_activity = now
+            _UPSTREAM_SESSION_LEASES.move_to_end(session_id)
+        _CHAT_HISTORY_SESSIONS[_chat_history_key(messages)] = (session_id, now)
+        _CHAT_HISTORY_SESSIONS.move_to_end(_chat_history_key(messages))
+
+    bound = dict(options)
+    bound["session_id"] = session_id
+    bound["_account_id"] = lease.account_id
+    bound["_pinned_account"] = True
+    if lease.billing_id:
+        bound["_billing_id"] = lease.billing_id
+    bound["_auth_token"] = lease.auth_token
+    if UPSTREAM_MODE in ("raw", "direct", "auto"):
+        bound["_auth_user_id"] = lease.billing_id or lease.account_id
+    if UPSTREAM_MODE != "cli":
+        bound["provider_specific"] = dict(lease.provider_specific)
+    return bound
+
+
 def _bind_chat_session(
     messages: list[dict],
     options: dict,
     *,
     requested_session_id: str = "",
     rotate_for_new: bool = True,
+    bound_account_id: str = "",
 ) -> dict:
-    """Attach a stable upstream session and account to one API request."""
+    """Attach a stable upstream session and account to one API request.
+
+    ``bound_account_id`` comes from a per-account API key. When set, the request
+    is pinned to that account: polling is skipped and no other credential is
+    ever substituted. A pinned account that cannot serve the request raises, so
+    the client gets a clear error instead of silently spending someone else's
+    quota.
+    """
+    if bound_account_id:
+        return _bind_pinned_account(messages, options, bound_account_id)
     now = time.monotonic()
     with _CHAT_SESSION_LOCK:
         _prune_chat_sessions(now)
@@ -2808,6 +2910,12 @@ async def run_solo_chat(messages, model, stream: bool, options: Optional[dict] =
     #    failure (see trae_solo._COOLDOWN_SECONDS).
     cooling, left, reason = await trae_solo.account_cooling(account_id)
     if cooling:
+        # Key-pinned requests must surface this as an account problem the
+        # caller can act on (switch keys), not as a generic upstream fault.
+        if options.get("_pinned_account"):
+            raise _PinnedAccountError(
+                f"account {account_id} is cooling down for {int(left)}s ({reason})"
+            )
         raise RuntimeError(
             f"account {account_id} cooling down {int(left)}s ({reason})"
         )
@@ -3163,6 +3271,7 @@ def _record_usage(
         ok=str(record.get("status") or "").lower() in ("completed", "ok", ""),
         ttfb_ms=record.get("ttfb_ms"),
         ts=record.get("timestamp"),
+        account_id=record.get("account_id"),
     )
     return record
 
@@ -3207,12 +3316,20 @@ async def _dispatch_chat(messages, model, stream: bool, options: Optional[dict] 
         )
     if not trae_client.is_model_supported(model):
         return _openai_error(400, f"Unsupported model: {model}", "invalid_request_error", "model")
-    if MODEL_ALLOWLIST and model.strip().lower() not in {
-        entry.lower() for entry in MODEL_ALLOWLIST
+    # The allowlist is per-account: a key bound to an account must obey THAT
+    # account's list, not the global default.
+    scoped_for_allowlist = (
+        str(options.get("_account_id") or "")
+        or auth.get_active_account_id()
+        or ""
+    )
+    effective_allow = allowlist_for(scoped_for_allowlist)
+    if effective_allow and model.strip().lower() not in {
+        entry.lower() for entry in effective_allow
     }:
         return _openai_error(
             403,
-            f"model not allowed by TRAE_MODEL_ALLOWLIST: {model}",
+            f"model not allowed for account {scoped_for_allowlist or '(global)'}: {model}",
             "invalid_request_error",
             "model",
         )
@@ -3286,6 +3403,10 @@ async def _dispatch_chat(messages, model, stream: bool, options: Optional[dict] 
                     messages, model, stream, mode_options
                 )
             return await run_ide_chat(messages, model, stream, mode_options)
+        except _PinnedAccountError:
+            # A pinned account's problem is terminal for this request: trying
+            # another route would bill a credential the key never authorised.
+            raise
         except Exception as e:
             logger.warning("upstream %s failed: %s", mode, e)
             errors.append(f"{mode}: {e}")
@@ -3359,11 +3480,21 @@ async def handle_chat(req: Request):
         if key in options:
             options[key] = clamp_max_completion_tokens(options[key], model)
     options = _with_auto_client_context(req, body, messages, options)
-    options = _bind_chat_session(
-        messages,
-        options,
-        requested_session_id=requested_session_id,
-    )
+    try:
+        options = _bind_chat_session(
+            messages,
+            options,
+            requested_session_id=requested_session_id,
+            bound_account_id=getattr(req.state, "bound_account_id", "") or "",
+        )
+    except _PinnedAccountError as exc:
+        # 503 (not 500): the key is valid, its account just cannot serve right
+        # now, and the fix is on the account side, not the request side.
+        return _openai_error(
+            503,
+            f"{exc} [key={getattr(req.state, 'api_key', '')[:12]}…]",
+            "account_unavailable",
+        )
     tracker = _UsageTracker(model, req.url.path, stream, options)
     tracker.request_id = request_id
     options["_relay_request_id"] = request_id
@@ -3438,11 +3569,19 @@ async def handle_responses(req: Request):
     # Trae conversation even when the caller sends only function_call_output.
     if not options.get("session_id") and not options.get("sessionId"):
         options["session_id"] = context.upstream_session_id or context.response_id
-    options = _bind_chat_session(
-        messages,
-        options,
-        requested_session_id=str(options.get("session_id") or options.get("sessionId") or ""),
-    )
+    try:
+        options = _bind_chat_session(
+            messages,
+            options,
+            requested_session_id=str(options.get("session_id") or options.get("sessionId") or ""),
+            bound_account_id=getattr(req.state, "bound_account_id", "") or "",
+        )
+    except _PinnedAccountError as exc:
+        return _openai_error(
+            503,
+            f"{exc} [key={getattr(req.state, 'api_key', '')[:12]}…]",
+            "account_unavailable",
+        )
     stream = bool(body.get("stream", False))
     tracker = _UsageTracker(context.model, req.url.path, stream, options)
     tracker.request_id = request_id
@@ -3610,9 +3749,60 @@ app = FastAPI(title="Trae CN Relay", version="1.2.0", lifespan=lifespan)
 
 
 @app.get("/api/stats")
-async def api_stats():
-    """Aggregated console payload: totals, today, 7-day series, model split."""
-    return JSONResponse(stats_agg.snapshot())
+async def api_stats(request: Request):
+    """Aggregated console payload: totals, today, 7-day series, model split.
+
+    Scoping, most specific first:
+      ``?api_key=``   -> the account that key is bound to (per-key usage view)
+      ``?account_id=`` -> that account
+      neither         -> pool totals
+    """
+    api_key = (request.query_params.get("api_key") or "").strip()
+    account_id = (request.query_params.get("account_id") or "").strip()
+    if api_key:
+        bound = auth.account_for_api_key(api_key)
+        if not bound:
+            return JSONResponse(
+                {"success": False, "error": "api_key is not bound to any account"},
+                status_code=404,
+            )
+        account_id = bound
+    return JSONResponse(stats_agg.snapshot(account_id=account_id or None))
+
+
+@app.get("/api/api-keys")
+async def api_api_keys():
+    """Every key the relay accepts, with the account it resolves to.
+
+    ``.env`` keys are reported as unbound: they authorise a request without
+    pinning it, so they fall through to the active/polling account.
+    """
+    rows = []
+    seen = set()
+    for aid, rec in auth.get_accounts_raw():
+        key = str(rec.get("api_key") or "").strip()
+        if not key:
+            continue
+        seen.add(key)
+        rows.append({
+            "api_key": key,
+            "hint": (key[:12] + "…" + key[-4:]) if len(key) > 20 else key,
+            "account_id": aid,
+            "label": rec.get("label") or rec.get("user_id") or aid,
+            "bound": True,
+        })
+    for key in API_KEYS:
+        if key in seen:
+            continue
+        rows.append({
+            "api_key": key,
+            "hint": (key[:12] + "…" + key[-4:]) if len(key) > 20 else key,
+            "account_id": "",
+            "label": "（.env 全局 key，走当前账号/轮询）",
+            "bound": False,
+        })
+    return JSONResponse({"success": True, "keys": rows},
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/usage/summary")
@@ -3656,20 +3846,38 @@ async def usage_summary():
 
 
 @app.get("/api/checkin/history")
-async def checkin_history():
+async def checkin_history(request: Request):
+    """Check-in history, newest first.
+
+    ``?account_id=`` narrows it to one account. Records always carried the id;
+    only the filter was missing, so older rows work without migration.
+    """
+    account_id = (request.query_params.get("account_id") or "").strip()
     try:
         payload = json.loads(_CHECKIN_HISTORY_PATH.read_text("utf-8"))
         records = payload.get("records", []) if isinstance(payload, dict) else []
     except Exception:
         records = []
+    if account_id:
+        records = [
+            r for r in records
+            if isinstance(r, Mapping) and str(r.get("account_id") or "") == account_id
+        ]
     return JSONResponse({"success": True, "records": records[-50:][::-1]})
 
 
 @app.get("/api/usage/records")
-async def get_usage_records():
-    """Return the usage history list (newest first)."""
+async def get_usage_records(request: Request):
+    """Return the usage history list (newest first).
+
+    ``?account_id=`` narrows it to one account so the request log can be read
+    per account instead of as a pool-wide blend.
+    """
+    account_id = (request.query_params.get("account_id") or "").strip()
     with _USAGE_LOCK:
         records = [_normalize_usage_record(record) for record in _USAGE_HISTORY]
+    if account_id:
+        records = [r for r in records if str(r.get("account_id") or "") == account_id]
     return JSONResponse(records, headers={"Cache-Control": "no-store"})
 
 @app.get("/api/usage/last")
@@ -3711,6 +3919,10 @@ async def api_checkin_work_credits(account_id: str):
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
+    # Authentication is only enforced when the operator configured at least one
+    # key in RELAY_API_KEYS. Per-account keys are an additional accepted set,
+    # never a reason to start rejecting traffic on their own: an empty
+    # RELAY_API_KEYS has always meant "this relay is open".
     if not API_KEYS:
         return await call_next(request)
     if request.url.path in PUBLIC_PATHS or request.url.path.startswith(PUBLIC_PATH_PREFIXES):
@@ -3720,8 +3932,13 @@ async def auth_middleware(request: Request, call_next):
         token = header[7:].strip()
     else:
         token = header.strip()
-    if token not in API_KEYS:
+    if token not in API_KEYS and token not in auth.known_api_keys():
         return _openai_error(401, "Invalid API key", "authentication_error")
+    # A key bound to one account pins every request it authorises to that
+    # account; an unbound (.env) key leaves routing to the active/polling
+    # selection, exactly as before.
+    request.state.api_key = token
+    request.state.bound_account_id = auth.account_for_api_key(token)
     return await call_next(request)
 
 
@@ -3784,18 +4001,28 @@ async def status():
 
 
 @app.get("/api/allowlist")
-async def api_allowlist_get():
+async def api_allowlist_get(request: Request):
+    # account_id scopes both the catalog and the saved selection; omit it for
+    # the global defaults (legacy behaviour).
+    scoped = (
+        getattr(request.state, "bound_account_id", "")
+        or (request.query_params.get("account_id") or "").strip()
+    )
+    effective_account = scoped or str(auth.get_active_account_id() or "default")
     all_ids = []
     try:
         if UPSTREAM_MODE in ("solo", "solo-lite", "llm_utils_chat"):
             # The picker must offer what the active upstream actually serves;
             # the legacy trae_client table lists models SOLO does not have.
-            account_id = str(auth.get_active_account_id() or "default")
+            account_id = effective_account
             record = auth.get_account_record(account_id) or {}
             token = str(record.get("token") or auth.get_token() or "").strip()
             user_id = str(record.get("user_id") or account_id or "")
             if token:
-                async with httpx.AsyncClient(timeout=None) as client:
+                # Bounded, not timeout=None: an unreachable upstream must
+                # degrade to an empty catalog instead of hanging the request
+                # forever (the console then sits on "loading..." indefinitely).
+                async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
                     items = await trae_solo.get_models(client, token, user_id, force=False)
                 all_ids = sorted({str(e.get("id", "")).strip() for e in items if e.get("id")})
         else:
@@ -3803,10 +4030,17 @@ async def api_allowlist_get():
             all_ids = sorted({str(e.get("id", "")).strip() for e in items if e.get("id")})
     except Exception as exc:
         logger.warning("allowlist fetch all ids failed: %s", exc)
+    account_ids = sorted(ACCOUNT_ALLOWLISTS.get(scoped) or []) if scoped else []
     return {
         "success": True,
         "all": all_ids,
-        "allowed": sorted(MODEL_ALLOWLIST),
+        "allowed": sorted(allowlist_for(scoped)),
+        "account_id": scoped,
+        # True when this account has its own list; False means it follows the
+        # global one and saving will create an account-specific override.
+        "account_specific": bool(scoped) and scoped in ACCOUNT_ALLOWLISTS,
+        "account_ids": account_ids,
+        "global_allowed": sorted(MODEL_ALLOWLIST),
     }
 
 
@@ -3817,9 +4051,25 @@ async def api_allowlist_post(req: Request):
     except Exception:
         return JSONResponse({"success": False, "error": "invalid JSON body"}, status_code=400)
     ids = body.get("ids") if isinstance(body, dict) else None
-    if not isinstance(ids, list):
+    target = str((body.get("account_id") or "")).strip() if isinstance(body, dict) else ""
+    reset_account = bool(body.get("reset_account")) if isinstance(body, dict) else False
+    # reset_account drops the override, so no ids are needed for that path.
+    if not reset_account and not isinstance(ids, list):
         return JSONResponse({"success": False, "error": "ids array required"}, status_code=400)
-    cleaned = sorted({trae_solo.canonical_model(str(m).strip()) for m in ids if str(m).strip()})
+    cleaned = sorted({trae_solo.canonical_model(str(m).strip()) for m in (ids or []) if str(m).strip()})
+    # account_id present -> save that account's own list; absent -> global.
+    # reset_account=True drops the override so the account follows the global
+    # list again.
+    if reset_account and target:
+        ACCOUNT_ALLOWLISTS.pop(target, None)
+        _save_allowlist_file()
+        return {"success": True, "account_id": target, "account_specific": False,
+                "count": len(MODEL_ALLOWLIST), "ids": sorted(MODEL_ALLOWLIST)}
+    if target:
+        ACCOUNT_ALLOWLISTS[target] = set(cleaned)
+        _save_allowlist_file()
+        return {"success": True, "account_id": target, "account_specific": True,
+                "count": len(cleaned), "ids": cleaned}
     MODEL_ALLOWLIST.clear()
     MODEL_ALLOWLIST.update(cleaned)
     _save_allowlist_file()
@@ -3834,15 +4084,25 @@ async def models(request: Request):
     # allowlist would hide every other model from the console too, making the
     # list impossible to grow back.
     show_all = request.query_params.get("all", "").lower() in {"1", "true", "yes"}
+    # Catalog scope, most specific first: the API key's bound account (a key
+    # must see what ITS account can serve), then an explicit console override,
+    # then the globally active account.
+    scoped_account = (
+        getattr(request.state, "bound_account_id", "")
+        or (request.query_params.get("account_id") or "").strip()
+        or str(auth.get_active_account_id() or "default")
+    )
     try:
         if UPSTREAM_MODE in ("solo", "solo-lite", "llm_utils_chat"):
-            account_id = str(auth.get_active_account_id() or "default")
+            account_id = scoped_account
             record = auth.get_account_record(account_id) or {}
             token = str(record.get("token") or auth.get_token() or "").strip()
             if not token:
                 raise RuntimeError("No Cloud-IDE-JWT token available")
             user_id = str(record.get("user_id") or account_id or "")
-            async with httpx.AsyncClient(timeout=None) as client:
+            # Bounded, not timeout=None: an unreachable upstream must surface
+            # as a 502 quickly instead of hanging the console on "loading...".
+            async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
                 items = await trae_solo.get_models(
                     client, token, user_id, force=force
                 )
@@ -3850,12 +4110,13 @@ async def models(request: Request):
             items = await trae_client.get_models(force=force)
     except Exception as e:
         return _openai_error(502, str(e), "api_error")
-    if MODEL_ALLOWLIST and not show_all:
+    effective_allow = allowlist_for(scoped_account if scoped_account != "default" else "")
+    if effective_allow and not show_all:
         seen = {}
         for entry in items:
             mid = str(entry.get("id", "")).strip()
             key = mid.lower()
-            if key not in {m.lower() for m in MODEL_ALLOWLIST}:
+            if key not in {m.lower() for m in effective_allow}:
                 continue
             if key not in seen or mid == key:
                 # one entry per allowlist id; prefer the exact lowercase form
@@ -3948,6 +4209,25 @@ async def api_model_test(req: Request):
         messages = [{"role": "user", "content": "Reply with exactly: pong"}]
         options = {}
     options["max_tokens"] = 64
+    # Probe a specific account when asked, so a per-key/per-account setup can
+    # be verified without switching the global active account first.
+    probe_account = str(body.get("account_id") or "").strip()
+    if probe_account:
+        record = auth.get_account_record(probe_account)
+        if not record:
+            return JSONResponse(
+                {"success": False, "error": f"account not found: {probe_account}"},
+                status_code=404,
+            )
+        token = str(record.get("token") or "").strip()
+        if not token:
+            return JSONResponse(
+                {"success": False, "error": f"account has no token: {probe_account}"},
+                status_code=400,
+            )
+        options["_account_id"] = probe_account
+        options["_auth_token"] = token
+        options["_pinned_account"] = True
 
     started = time.monotonic()
     try:
@@ -4352,6 +4632,7 @@ def _cached_checkin_account_snapshot(
     """Build one dashboard row from the persisted cache without an upstream call."""
     record = rec if rec is not None else auth.get_account_record(account_id)
     cached = dict(record.get("checkin") or {})
+    bound_key = str(record.get("api_key") or "").strip()
     return {
         "success": True,
         "id": account_id,
@@ -4359,6 +4640,10 @@ def _cached_checkin_account_snapshot(
         "label": record.get("label") or record.get("user_id") or account_id,
         "source": record.get("source", ""),
         "has_token": bool(record.get("token")),
+        # Only the tail is exposed; the console needs to tell keys apart, not
+        # to read them back in full.
+        "has_api_key": bool(bound_key),
+        "api_key_hint": (bound_key[:12] + "…" + bound_key[-4:]) if len(bound_key) > 20 else bound_key,
         "is_active": account_id == auth.get_active_account_id(),
         "is_valid": bool(record.get("token")),
         "expires": record.get("expired_at", ""),
@@ -5168,6 +5453,45 @@ async def api_accounts():
     accounts = auth.list_accounts()
     polling = auth.get_polling_status()
     return JSONResponse({"success": True, "accounts": accounts, "polling": polling, "active": polling.get("active_account", "")})
+
+
+@app.post("/api/accounts/api-key")
+async def api_accounts_api_key(request: Request):
+    """Bind, rotate (with ``generate``), or clear (``api_key: ""``) one account's key.
+
+    Each key routes every request it authorises to exactly one account, so a
+    caller can no longer be silently served by another account's quota.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "Invalid JSON body"}, status_code=400)
+    account_id = str(body.get("account_id") or body.get("id") or "").strip()
+    if not account_id:
+        return JSONResponse({"success": False, "error": "account_id is required"}, status_code=400)
+    if not auth.get_account_record(account_id):
+        return JSONResponse({"success": False, "error": "account not found"}, status_code=404)
+
+    if body.get("generate"):
+        api_key = "sk-trae-" + secrets.token_hex(16)
+    else:
+        api_key = str(body.get("api_key") or "").strip()
+        if api_key:
+            existing = auth.account_for_api_key(api_key)
+            if existing and existing != account_id:
+                return JSONResponse(
+                    {"success": False, "error": f"该 key 已绑定到账号 {existing}"},
+                    status_code=409,
+                )
+            if api_key in API_KEYS:
+                return JSONResponse(
+                    {"success": False, "error": "该 key 已在 RELAY_API_KEYS 中使用"},
+                    status_code=409,
+                )
+
+    if not auth.set_account_api_key(account_id, api_key):
+        return JSONResponse({"success": False, "error": "account not found"}, status_code=404)
+    return JSONResponse({"success": True, "account_id": account_id, "api_key": api_key})
 
 
 @app.post("/api/accounts/switch")

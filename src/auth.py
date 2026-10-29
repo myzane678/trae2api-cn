@@ -943,6 +943,61 @@ def get_account_record(account_id: str) -> dict:
         return dict(rec) if rec else {}
 
 
+# ── per-account API keys ──────────────────────────────────────────────
+# A bound key routes every request it authorises to exactly one account. The
+# key lives on the account record so creating/removing an account takes its
+# keys with it, and so nothing else has to be kept in sync.
+#
+# Keys configured the old way (RELAY_API_KEYS in .env, unbound) keep working:
+# they authorise a request without pinning an account, so the caller falls
+# through to whatever the active/polling selection says. That is the behaviour
+# every existing client already relies on.
+
+
+def set_account_api_key(account_id: str, api_key: str) -> bool:
+    """Bind (or clear, with an empty value) the account's own API key."""
+    with _STORE_LOCK:
+        rec = _accounts.get(account_id)
+        if not rec:
+            return False
+        key = str(api_key or "").strip()
+        if key:
+            rec["api_key"] = key
+        else:
+            rec.pop("api_key", None)
+        _save_accounts()
+        return True
+
+
+def get_account_api_key(account_id: str) -> str:
+    with _STORE_LOCK:
+        rec = _accounts.get(account_id) or {}
+        return str(rec.get("api_key") or "")
+
+
+def account_for_api_key(api_key: str) -> str:
+    """Account id bound to ``api_key``, or "" when the key is unbound/unknown."""
+    key = str(api_key or "").strip()
+    if not key:
+        return ""
+    with _STORE_LOCK:
+        for aid, rec in _accounts.items():
+            if str(rec.get("api_key") or "").strip() == key:
+                return aid
+    return ""
+
+
+def known_api_keys() -> set[str]:
+    """Every key the relay accepts: bound per-account keys plus .env keys."""
+    with _STORE_LOCK:
+        bound = {
+            str(rec.get("api_key") or "").strip()
+            for rec in _accounts.values()
+            if str(rec.get("api_key") or "").strip()
+        }
+    return bound
+
+
 def list_accounts() -> list[dict]:
     with _STORE_LOCK:
         result = []

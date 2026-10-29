@@ -1,14 +1,33 @@
-# Trae2api-cn（本地维护版）
+# Trae2API CN（本地维护版）
 
-## 本地部署卡（2026-10-10）
+> WorkBuddy / Trae CN 的 OpenAI 兼容反向代理（Python / FastAPI）。多账号、工具调用、
+> 流式输出、桌面快捷方式启动、按账号统计与独立 API Key。
+>
+> **仅供学习和技术交流使用，请勿用于任何商业用途。** 使用本项目需自行遵守 Trae /
+> CodeBuddy 的服务条款，一切使用风险由使用者自行承担。
 
-| 项 | 值 |
+## 项目来源与致谢
+
+本项目基于 [autumnsentiment/Trae2api-cn](https://github.com/autumnsentiment/Trae2api-cn)
+（MIT License）修改而来，感谢原作者的工作。本地维护版相对上游的主要改动
+（SOLO 通道、多账号、控制台、Windows 部署链路、按账号 API Key 等）见
+[CHANGELOG.md](CHANGELOG.md)。
+
+控制台布局与启动链路参考了 [myzane678/WorkBuddy-Proxy](https://github.com/myzane678/WorkBuddy-Proxy)
+（MIT License，WorkBuddy CN 反向代理），感谢其侧边栏分组、看门狗与快捷方式启动的设计。
+
+## 贡献者
+
+- [autumnsentiment](https://github.com/autumnsentiment) — 上游 Trae2api-cn 原作者
+- [myzane678](https://github.com/myzane678) — 本地维护版（WorkBuddy-Proxy 作者），
+  控制台布局与启动链路借鉴自其 WorkBuddy-Proxy
+
+| 本地部署卡（2026-10-10） | 值 |
 |---|---|
-| 上游来源 | autumnsentiment/Trae2api-cn（Python/FastAPI，本地补丁见 CHANGELOG.md v1-v30） |
 | 服务地址 | `http://127.0.0.1:8092/v1`（OpenAI Chat Completions 兼容 + Codex Responses API） |
-| 鉴权 | `Authorization: Bearer sk-trae-6a056f59f298f35f69f01772515f3316` |
+| 鉴权 | `Authorization: Bearer <你的 RELAY_API_KEYS>`（配置在 `.env`） |
 | 控制台 | `http://127.0.0.1:8092/web/login`（账号/积分/签到/白名单勾选/消费记录含首字耗时） |
-| 启停 | `start-trae2api.cmd`（8092 + 8765 助手）/ `stop-trae2api.cmd`，无窗口自关 |
+| 启停 | `launch.vbs`（桌面快捷方式，隐藏启动 + 常驻看门狗）/ `start-trae2api.cmd`（控制台窗口）/ `stop-trae2api.cmd`（连看门狗一起停） |
 | 登录 | 控制台授权按钮（或 `start-trae2api-login.cmd` 先行）；token 自动续期 |
 | 白名单 | 控制台勾选管理（data/model-allowlist.json）；**不勾 = 放行全部**；`/v1/models?all=1` 查完整目录（当前 25 个） |
 | 工具调用 | ✅ SOLO 原生通道：请求体原生 `tools`/`tool_choice`，SSE `event:output.tool_calls` 结构化返回，标准 OpenAI 流式 `tool_calls` delta。**25 个模型全部实测通过**，含 3 工具并行调用（参数 JSON 合法、index 分组正确） |
@@ -61,6 +80,8 @@
 - 每日签到：一键签到、定时自动签到（北京时间）、9074 风控自动换设备 ID 并退避重试
 - 积分与消费记录：按请求记录 tokens、单次积分、状态、首字耗时、收到字数
 - 网页控制台：运行概览、账号池、模型白名单、请求日志、设置、连接测试
+- **按账号区分**：概览/请求日志/签到记录/模型白名单/连接测试全部可按账号切换或筛选
+- **按账号 API Key**：每个账号可绑定独立 key；绑定账号不可用时直接 503 报错（不自动换号），`.env` 全局 key 保持原有轮询行为
 
 ## 认证方式
 
@@ -86,7 +107,17 @@ Windows 本机推荐用一键启动（零黑窗，含 OAuth 助手）：
 start-trae2api.cmd
 ```
 
-停止：`stop-trae2api.cmd`。
+想要「双击桌面图标即用」的体验，先建一次快捷方式：
+
+```cmd
+create-desktop-shortcut.cmd
+```
+
+之后双击桌面的 `Trae2API` 即可：服务没起就隐藏拉起（约 3~20 秒）并以 Chrome 应用窗口
+打开控制台；已在运行则秒开。`launch.vbs` 同时会拉起 `watchdog.ps1` 常驻探活
+（每 5 秒查一次 `/healthz`，掉线自动重启，日志在 `data/watchdog.log`）。
+
+停止：`stop-trae2api.cmd`（会先停看门狗再停服务，否则会被立刻拉起）。
 
 ## 配置
 
@@ -184,9 +215,12 @@ src/                    relay 服务与协议转换
   web/admin.html        控制台前端（独立文件，避免 f-string 转义坑）
 tools/oneclick.py       Windows 零黑窗一键启动核心
 tests/                  离线协议、流式和路由回归测试
-launch.vbs              桌面快捷方式入口（隐藏启动）
+launch.vbs              桌面快捷方式入口（隐藏启动 + 拉起看门狗）
 start-trae2api.cmd      控制台入口
-stop-trae2api.cmd       停止服务
+stop-trae2api.cmd       停止服务（含看门狗）
+watchdog.vbs            无窗口拉起 watchdog.ps1
+watchdog.ps1            常驻探活，掉线自动重启（崩溃自愈）
+create-desktop-shortcut.cmd  生成桌面 Trae2API 快捷方式
 ```
 
 发布前运行：
@@ -204,8 +238,12 @@ node --check .tmp/admin.js   # 抽出 <script> 块后检查
 
 ## 开源协议
 
-MIT License
+[MIT](LICENSE)
 
-Copyright (c) 2026 autumnsentiment
+Copyright (c) 2026 autumnsentiment（上游）、myzane678（本地维护版改动）
 
 本项目仅用于学习和研究目的。使用本项目产生的任何后果由使用者自行承担。
+
+## 更新日志
+
+查看 [CHANGELOG.md](CHANGELOG.md)

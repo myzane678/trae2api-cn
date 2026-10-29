@@ -1,5 +1,69 @@
 # CHANGELOG — trae2api-cn
 
+## v31 (2026-10-29)：本地维护版首发——桌面快捷方式启动、控制台改版、按账号区分与独立 API Key
+
+本版本是从上游 `autumnsentiment/Trae2api-cn`（v30）分出的**本地维护版首个公开版本**，
+控制台布局与 Windows 启动链路参考了 `myzane678/WorkBuddy-Proxy`。
+
+### 新增
+
+- **桌面快捷方式启动链路（对齐 WorkBuddy-Proxy 的体验）**
+  - `launch.vbs`：无黑窗拉起服务 + 常驻看门狗，健康后用 Chrome 应用窗口打开控制台；
+    路径从脚本自身位置推导，项目搬目录不再失效（上游脚本硬编码绝对路径）。
+  - `watchdog.ps1` / `watchdog.vbs`：每 5 秒探活 `/healthz`，掉线自动重启（实测崩溃后
+    6~9 秒自愈）；探活直接调 `curl.exe`（`Start-Process` 不写 `$LASTEXITCODE`，会让
+    看门狗误判宕机反复强杀——借鉴 WorkBuddy-Proxy 的踩坑记录）。
+  - `create-desktop-shortcut.cmd`：一键生成桌面图标（用 .NET `DesktopDirectory` 解析
+    真实桌面路径，OneDrive 重定向的机器也能放对位置）。
+  - `stop-trae2api.cmd`：先停看门狗再停服务（顺序反了会被立刻拉起），按 `$PSScriptRoot`
+    精确匹配避免误伤同机的其他代理项目。
+
+- **按账号 API Key（key → 账号绑定）**
+  - 每个账号可绑定独立 key（控制台「账号池」生成/更换/复制/清除），请求固定路由到该
+    账号，跳过所有轮询与降级；绑定账号不可用（缺失/无 token/冷却）时返回
+    **503 `account_unavailable`** 并指名账号，**绝不自动换号**消耗他人配额。
+  - `.env` 的 `RELAY_API_KEYS` 全局 key 保持原行为（走当前账号/轮询），完全向后兼容；
+    鉴权仅在配置了 `RELAY_API_KEYS` 时启用。
+  - key 冲突保护：已被其他账号绑定或与全局 key 重复时拒绝（409）。
+  - 新接口：`POST /api/accounts/api-key`、`GET /api/api-keys`、`GET /api/stats?api_key=`。
+
+- **所有控制台栏目按账号区分**
+  - 运行概览：卡片/趋势/模型分布/可用积分/接入信息全部跟随作用域（当前账号 /
+    指定账号 / 指定 key），页头明确标注「账号：xxx」或「Key：xxx」。
+  - 请求日志：页头账号筛选（`/api/usage/records?account_id=`）。
+  - 签到记录：卡片内账号筛选（`/api/checkin/history?account_id=`）。
+  - 模型白名单：**按账号独立配置**（`data/model-allowlist.json` 增加 `accounts` 段，
+    旧平铺格式仍可读）；无专属配置自动跟随全局；「跟随全局」一键恢复；dispatch 与
+    `/v1/models` 的过滤均按请求所属账号执行，403 文案带账号 id。
+  - 连接测试：可指定探测账号，不必先切换全局激活账号。
+
+### 修复
+
+- **`/api/allowlist` 与 `/v1/models` 无限挂起**：两处 `httpx.AsyncClient(timeout=None)`
+  改为 `Timeout(30s, connect=10s)`；上游不可达时快速降级而不是永久卡住控制台
+  「加载中」。聊天流路径的 `timeout=None` 为有意设计（真实超时在 solo 通道内部分别
+  为 300s/30s），未改动。
+- **模型目录缓存跨账号串用**：`trae_solo` 的目录缓存由全局单份改为按 `user_id` 分桶，
+  不同权利的账号不再互相看到对方的模型列表；上游拉取失败时也不会用其他账号的目录兜底。
+- **账号有效期显示乱码**：`expires` 同时兼容 ISO 字符串与秒/毫秒时间戳（原来对时间戳
+  做字符串切片得到错误数字）。
+- **前端静默吞错**：模型目录加载失败时渲染明确的错误提示与重试入口，不再永远停在
+  「加载中」。
+- **切换账号竞态**：概览数据改为先等账号列表解析出新激活账号再拉取，避免拿到旧账号
+  的统计。
+
+### 文档
+
+- README 重写：补充免责声明（仅供学习技术交流）、项目来源与致谢、贡献者、
+  CHANGELOG 引用；移除所有真实 API Key 明文。
+
+### 测试
+
+- 新增 `tests/test_account_api_keys.py`（10 用例）：key 绑定/解绑/持久化/随账号删除/
+  双账号隔离/凭证不串/缺账号与无 token 快速报错/旧 key 仍走轮询。
+- 全量 `pytest`：387 passed, 1 failed（`test_web_headers_preserve_bound_empty_provider_metadata`
+  为分叉前上游即存在的问题，与本版本改动无关）。
+
 ## v30 (2026-10-10)：截断根因定案（模型侧，非通道侧）+ 无效补丁回退 + 全模型实测
 
 ### 结论先行
@@ -461,10 +525,10 @@ remote 家族延迟过高（184-408s）不适合交互，本版继续只用 `sol
 ### 部署
 - 位置：`A:\ClaudeWorkspace\trae2api-cn`（venv 在 `.venv\`，Python 3.13，依赖走清华镜像）
 - 端口：`127.0.0.1:8092`（8090 zcode / 8091 workbuddy 之后的第三顺位）
-- API Key：`sk-trae-6a056f59f298f35f69f01772515f3316`（写在 `.env` 的 RELAY_API_KEYS）
+- API Key：`<your-relay-api-key>`（写在 `.env` 的 RELAY_API_KEYS）
 - 认证：`TRAE_AUTH_SOURCE=web-login`，授权回调助手监听 `127.0.0.1:8765`，token 自动续期
 - 上游：`UPSTREAM_MODE=remote`（默认 Agent 执行器，调用端工具请求自动走 Work 会话）
-- 账号：star（uid 604047438004087），签到积分 150 通用 + 50 额外
+- 账号：star（uid 已脱敏），签到积分 150 通用 + 50 额外
 
 ### 脚本（纯 ASCII，无窗口自关；`timeout` 换成 `ping -n 3` 防无控制台环境报错）
 - `start-trae2api.cmd` — 启动 relay（日志落 `data\relay-stdout/stderr.log`）

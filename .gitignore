@@ -38,3 +38,8 @@ __pycache__/
 /*.bin
 *.bak
 server.log
+
+# Local maintenance working files (session handoff, layout backup, env backup)
+/memory.md
+/src/web/admin.html.bak*
+/.env.bak*

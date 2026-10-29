@@ -387,6 +387,9 @@ def catalog_model_entry(config: Mapping[str, Any]) -> dict[str, Any]:
 
 _models_cache: list[dict] = []
 _models_cached_at = 0.0
+# Per-account catalogs: {user_id: (entries, monotonic_stamp)}. The flat pair
+# above mirrors the most recent one for legacy readers.
+_models_caches: dict[str, tuple[list[dict], float]] = {}
 
 
 def cached_models() -> list[dict]:
@@ -457,16 +460,31 @@ def model_credit_rate(model: str) -> Optional[float]:
 async def get_models(
     client: httpx.AsyncClient, token: str, user_id: str, *, force: bool = False
 ) -> list[dict]:
-    """Catalog with a TTL cache so /v1/models never hammers the upstream."""
+    """Catalog with a per-account TTL cache so /v1/models never hammers the upstream.
+
+    The cache is keyed by user_id: two accounts can be entitled to different
+    model sets, and a shared cache would serve one account's catalog to the
+    other (a key would then see models its own account cannot call).
+    """
     global _models_cache, _models_cached_at
+    cache_key = str(user_id or "") or "default"
     ttl = float(os.environ.get("TRAE_SOLO_MODELS_TTL", "600") or "600")
-    if not force and _models_cache and (time.monotonic() - _models_cached_at) < ttl:
-        return list(_models_cache)
+    cached = _models_caches.get(cache_key)
+    if not force and cached is not None:
+        entries, stamped = cached
+        if entries and (time.monotonic() - stamped) < ttl:
+            return list(entries)
     catalog = await fetch_model_catalog(client, token, user_id)
     if catalog:
-        _models_cache = [catalog_model_entry(config) for config in catalog]
+        entries = [catalog_model_entry(config) for config in catalog]
+        _models_caches[cache_key] = (entries, time.monotonic())
+        # Keep the legacy module globals in step for readers that still use
+        # them (cached_models(), model_credit_rate(), the startup path).
+        _models_cache = entries
         _models_cached_at = time.monotonic()
-    return list(_models_cache)
+        return list(entries)
+    # Upstream returned nothing: never answer with another account's catalog.
+    return list(cached[0]) if cached else []
 
 
 # ──────────────────────────── risk control ────────────────────────────

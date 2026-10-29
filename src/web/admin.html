@@ -15,7 +15,7 @@
   --radius:12px;
   --shadow:0 1px 2px rgba(16,24,40,.05);
   --shadow-lg:0 4px 16px rgba(16,24,40,.08);
-  --sidew:232px;
+  --sidew:248px; --sidew-mini:72px; --gutter:28px; --top-h:60px;
 }
 *{box-sizing:border-box}
 html{background:var(--bg)}
@@ -27,42 +27,84 @@ body{min-height:100vh;background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:#d3d9e3;border-radius:8px;border:2.5px solid transparent;background-clip:content-box}
 ::-webkit-scrollbar-thumb:hover{background:#bcc4d2}
 
-/* ───── sidebar ───── */
+/* ───── 左侧边栏：品牌区 / 分区导航 / 服务动作 / 折叠 ───── */
 .side{position:fixed;top:0;left:0;bottom:0;width:var(--sidew);z-index:30;display:flex;flex-direction:column;
-  background:var(--card);border-right:1px solid var(--line)}
-.sbrand{display:flex;align-items:center;gap:10px;padding:18px 16px 15px}
-.sbrand .logo{width:34px;height:34px;border-radius:9px;flex:none;display:block;object-fit:cover}
-.sbrand .t{min-width:0}
-.sbrand .t b{display:block;font-size:15px;font-weight:700;letter-spacing:.2px;line-height:1.35}
-.sstatus{display:inline-flex;align-items:center;gap:6px;color:var(--dim);font-size:11.5px;line-height:1.4}
+  background:var(--card);border-right:1px solid var(--line);
+  transition:width .24s cubic-bezier(.4,0,.2,1)}
+.sbrand{display:flex;align-items:center;gap:11px;height:var(--top-h);padding:0 18px;flex:none;
+  border-bottom:1px solid var(--line);overflow:hidden}
+.sbrand .logo{width:30px;height:30px;border-radius:9px;flex:none;display:block;object-fit:cover}
+.sbrand .t{min-width:0;overflow:hidden;transition:opacity .16s ease,max-width .22s ease}
+.sbrand .t b{display:block;font-size:14.5px;font-weight:700;letter-spacing:.2px;line-height:1.3;white-space:nowrap}
+.sstatus{display:inline-flex;align-items:center;gap:6px;color:var(--dim);font-size:11.5px;line-height:1.4;white-space:nowrap}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:none;
   box-shadow:0 0 0 3px rgba(5,150,105,.14);animation:breathe 2.4s ease-in-out infinite}
 .dot.err{background:var(--err);box-shadow:0 0 0 3px rgba(220,38,38,.14)}
 @keyframes breathe{50%{opacity:.5}}
-.snav{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:3px}
-.navitem{display:flex;align-items:center;gap:10px;padding:8.5px 12px;border-radius:9px;color:#4b5563;
+
+.snav{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 12px 8px;display:flex;flex-direction:column;gap:2px}
+.sgrp{margin-bottom:16px}
+.sgrp:last-child{margin-bottom:4px}
+.sgrp-t{font-size:10.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--dim2);
+  padding:5px 12px 7px;white-space:nowrap;transition:opacity .14s ease}
+.navitem{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:#475569;
   font-size:13.5px;font-weight:500;line-height:1.4;white-space:nowrap;text-decoration:none;cursor:pointer;
   transition:background .12s ease,color .12s ease;border:0;background:none;font-family:inherit;width:100%;text-align:left}
-.navitem svg{width:16px;height:16px;flex:none;opacity:.8}
+.navitem svg{width:17px;height:17px;flex:none;opacity:.75}
+.navitem .lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;transition:opacity .14s ease}
 .navitem:hover{background:var(--soft);color:var(--txt)}
+.navitem:hover svg{opacity:1}
 .navitem.active{background:#eef2ff;color:#4338ca;font-weight:600}
 .navitem.active svg{opacity:1;color:var(--acc)}
+.navitem.asbtn{width:100%;background:none;border:0;cursor:pointer;font-family:inherit;text-align:left}
+.navitem.asbtn:active{transform:translateY(1px)}
 .navitem.red{color:var(--err)}
 .navitem.red:hover{background:#fef2f2;color:#b91c1c}
-.sfoot{padding:10px 12px 14px;border-top:1px solid var(--soft2);display:flex;flex-direction:column;gap:3px}
+.sfoot{padding:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px;flex:none}
+.sfoot .sgrp-t{padding:2px 12px 7px}
 .sfoot .navitem.off{color:var(--dim2)}
 .livedot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none;margin-left:auto;
   box-shadow:0 0 0 3px rgba(5,150,105,.14);animation:breathe 2.4s ease-in-out infinite}
 .sfoot .navitem.off .livedot{background:#9ca3af;box-shadow:none;animation:none}
 .sfoot .navitem .age{font-size:11.5px;color:var(--dim2);font-variant-numeric:tabular-nums}
+.scollapse{padding:0 12px 12px;flex:none}
+.scollapse .navitem{color:var(--dim2);font-size:12.5px}
+.scollapse .navitem:hover{color:var(--txt)}
+.scollapse .navitem svg{transition:transform .24s ease}
+
+/* 折叠态：72px 纯图标，悬停用原生 title 提示 */
+body.navmini .side{width:var(--sidew-mini)}
+body.navmini .side .sbrand{padding:0;justify-content:center}
+body.navmini .side .sbrand .t{opacity:0;max-width:0;pointer-events:none}
+body.navmini .side .snav{padding:12px 10px}
+body.navmini .side .sgrp{margin-bottom:12px}
+body.navmini .side .sgrp-t{height:1px;padding:0;margin:6px 8px 10px;background:var(--line);
+  font-size:0;overflow:hidden;color:transparent;border-radius:1px}
+body.navmini .side .navitem{justify-content:center;gap:0;padding:11px 0}
+body.navmini .side .navitem .lbl{opacity:0;max-width:0;pointer-events:none}
+body.navmini .side .navitem .age,body.navmini .side .navitem .livedot{display:none}
+body.navmini .side .sfoot{padding:12px 10px}
+body.navmini .side .sfoot .sgrp-t{height:1px;padding:0;margin:0 8px 10px;background:var(--line);font-size:0;overflow:hidden}
+body.navmini .side .scollapse{padding:0 10px 12px}
+body.navmini .side .scollapse .navitem svg{transform:rotate(180deg)}
 
 /* ───── main ───── */
-.main{margin-left:var(--sidew);min-height:100vh}
-.wrap{max-width:1200px;margin:0 auto;padding:0 28px 56px}
+.main{margin-left:var(--sidew);min-height:100vh;
+  transition:margin-left .24s cubic-bezier(.4,0,.2,1)}
+body.navmini .main{margin-left:var(--sidew-mini)}
+.wrap{max-width:1400px;margin:0 auto;padding:0 var(--gutter) 64px}
 .view{display:none}
 .view.on{display:block}
-.pagehead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:26px 2px 18px}
-.pagehead h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.2px}
+.mtop{display:none}
+#backdrop{display:none}
+
+/* ───── 页头：贴顶常驻，内容从其下方滚过 ───── */
+.pagehead{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:18px var(--gutter) 15px;margin:0 calc(var(--gutter) * -1) 20px;
+  background:rgba(246,247,250,.86);
+  -webkit-backdrop-filter:blur(14px) saturate(1.6);backdrop-filter:blur(14px) saturate(1.6);
+  border-bottom:1px solid var(--line)}
+.pagehead h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.2px;line-height:1.3}
 .pagehead .desc{color:var(--dim2);font-size:12.5px;font-family:var(--mono)}
 .pagehead .acts{margin-left:auto;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 
@@ -121,7 +163,6 @@ input.kinput[disabled],select.kinput[disabled]{background:var(--soft2);color:var
 .card h2 svg{width:14px;height:14px;flex:none;color:var(--acc);opacity:.9}
 .card h2 .hint{margin-left:auto;color:var(--dim2);font-size:11px;font-weight:400;letter-spacing:0}
 .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media (max-width:900px){.charts{grid-template-columns:1fr}}
 
 /* ───── trend ───── */
 .trend{display:flex;align-items:stretch;gap:12px;height:200px;padding:8px 4px 0}
@@ -197,6 +238,14 @@ tbody tr:last-child td{border-bottom:0}
 .astats i{color:var(--dim2);font-size:10.5px;font-style:normal}
 .astats b{font-family:var(--mono);font-size:13.5px}
 .aacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;padding-top:8px;border-top:1px solid #eceff4}
+/* Per-account API key row: the key itself is a monospace hint, muted when unbound. */
+.akey{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:8px;
+  border-top:1px solid #eceff4}
+.akey-lbl{color:var(--dim2);font-size:10.5px;font-weight:600;letter-spacing:.4px;flex:none}
+.akey-val{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:2px 8px;
+  font-family:var(--mono);font-size:11px;color:#374151;max-width:210px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.akey-val.none{color:var(--dim2);font-family:inherit;font-size:11px;border-style:dashed;max-width:none}
 .aacts .btn{padding:4px 10px;font-size:12px}
 
 /* ───── model list ───── */
@@ -231,11 +280,51 @@ tbody tr:last-child td{border-bottom:0}
   margin-right:8px;vertical-align:1px}
 #msg.err::before{background:var(--err)}
 @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.iconbtn{display:none;align-items:center;justify-content:center;width:34px;height:34px;flex:none;
+  background:var(--card);border:1px solid var(--line2);border-radius:9px;color:#374151;cursor:pointer;
+  padding:0;transition:all .15s ease}
+.iconbtn svg{width:17px;height:17px}
+.iconbtn:hover{border-color:#b9c2d0;background:var(--soft)}
+
+/* ───── 响应式：1180 / 960 / 720 三档 ───── */
+@media (max-width:1180px){
+  .charts{grid-template-columns:1fr}
+}
+@media (max-width:960px){
+  :root{--gutter:14px}
+  .main,body.navmini .main{margin-left:0}
+  .side{width:var(--sidew);transform:translateX(-102%);transition:transform .24s ease}
+  body.navmini .side{width:var(--sidew)}
+  body.navmini .side .sbrand{padding:0 18px;justify-content:flex-start}
+  body.navmini .side .sbrand .t{opacity:1;max-width:none}
+  body.navmini .side .navitem{justify-content:flex-start;gap:11px;padding:9px 12px}
+  body.navmini .side .navitem .lbl{opacity:1;max-width:none}
+  body.navmini .side .navitem .age,body.navmini .side .navitem .livedot{display:inline-block}
+  body.navmini .side .sgrp-t{height:auto;padding:5px 12px 7px;margin:0;background:none;font-size:10.5px;color:var(--dim2)}
+  .scollapse{display:none}
+  body.navopen .side{transform:none;box-shadow:0 12px 40px rgba(16,24,40,.22)}
+  body.navopen #backdrop{display:block;position:fixed;inset:0;z-index:25;background:rgba(17,24,39,.32)}
+  .mtop{display:flex;position:sticky;top:0;z-index:22;align-items:center;gap:11px;
+    background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);padding:10px var(--gutter)}
+  .mtop b{font-size:14.5px}
+  .iconbtn{display:inline-flex}
+  .pagehead{position:static;margin:0 0 16px;padding:16px 0 14px;background:none;
+    -webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .pagehead h1{font-size:18px}
+  .pagehead .desc{display:none}
+  .pagehead .acts{margin-left:0;width:100%}
+}
+@media (max-width:720px){
+  #accounts{grid-template-columns:1fr}
+  .tablewrap{max-height:none}
+  #msg{right:12px;left:12px;bottom:12px}
+}
 </style>
 </head>
 <body>
 
-<aside class="side">
+<aside class="side" id="side">
   <div class="sbrand">
     <img class="logo" src="/web/assets/t48.png" alt="Trae2API">
     <div class="t">
@@ -244,52 +333,79 @@ tbody tr:last-child td{border-bottom:0}
     </div>
   </div>
   <nav class="snav">
-    <a class="navitem active" data-v="overview" href="#/overview">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.8"/><rect x="13.5" y="12.5" width="7.5" height="8.5" rx="1.8"/><rect x="3" y="16.5" width="7.5" height="4.5" rx="1.8"/></svg>
-      运行概览</a>
-    <a class="navitem" data-v="accounts" href="#/accounts">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="3.5"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/><path d="M15.5 3.6a3.5 3.5 0 0 1 0 6.8"/></svg>
-      账号池</a>
-    <a class="navitem" data-v="models" href="#/models">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.3-2.9 7.3-7 9-4.1-1.7-7-4.7-7-9V6z"/><path d="M9.3 12l2 2 3.6-3.8"/></svg>
-      模型白名单</a>
-    <a class="navitem" data-v="logs" href="#/logs">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg>
-      请求日志</a>
-    <a class="navitem" data-v="settings" href="#/settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a1.7 1.7 0 0 0-1.6-1H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 3 8.6a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 7 4.6h.1A1.7 1.7 0 0 0 8.6 3V3a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-      设置</a>
-    <a class="navitem" data-v="conn" href="#/conn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.3"/></svg>
-      连接测试</a>
+    <div class="sgrp">
+      <div class="sgrp-t">监控</div>
+      <a class="navitem active" data-v="overview" href="#/overview" title="运行概览">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.8"/><rect x="13.5" y="12.5" width="7.5" height="8.5" rx="1.8"/><rect x="3" y="16.5" width="7.5" height="4.5" rx="1.8"/></svg>
+        <span class="lbl">运行概览</span></a>
+      <a class="navitem" data-v="logs" href="#/logs" title="请求日志">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg>
+        <span class="lbl">请求日志</span></a>
+      <a class="navitem" data-v="conn" href="#/conn" title="连接测试">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.3"/></svg>
+        <span class="lbl">连接测试</span></a>
+    </div>
+
+    <div class="sgrp">
+      <div class="sgrp-t">资源</div>
+      <a class="navitem" data-v="accounts" href="#/accounts" title="账号池">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="3.5"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/><path d="M15.5 3.6a3.5 3.5 0 0 1 0 6.8"/></svg>
+        <span class="lbl">账号池</span></a>
+      <a class="navitem" data-v="models" href="#/models" title="模型白名单">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.3-2.9 7.3-7 9-4.1-1.7-7-4.7-7-9V6z"/><path d="M9.3 12l2 2 3.6-3.8"/></svg>
+        <span class="lbl">模型白名单</span></a>
+      <a class="navitem" data-v="settings" href="#/settings" title="设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a1.7 1.7 0 0 0-1.6-1H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 3 8.6a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 7 4.6h.1A1.7 1.7 0 0 0 8.6 3V3a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <span class="lbl">设置</span></a>
+    </div>
   </nav>
+
   <div class="sfoot">
-    <button class="navitem" id="liveBtn" onclick="toggleLive()" title="点击暂停 / 恢复自动刷新">
+    <div class="sgrp-t">服务</div>
+    <button class="navitem asbtn" id="liveBtn" onclick="toggleLive()" title="点击暂停 / 恢复自动刷新">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>
-      <span id="liveTxt">自动刷新</span>
+      <span class="lbl" id="liveTxt">自动刷新</span>
       <span class="age" id="liveAge"></span>
       <span class="livedot" id="liveDot"></span>
     </button>
-    <button class="navitem" onclick="loadAll(this)">
+    <button class="navitem asbtn" onclick="loadAll(this)" title="刷新数据">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>
-      刷新数据</button>
-    <button class="navitem red" onclick="doRestart(this)">
+      <span class="lbl">刷新数据</span></button>
+    <button class="navitem asbtn red" onclick="doRestart(this)" title="重启服务">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
-      重启服务</button>
-    <button class="navitem red" onclick="doStop(this)">
+      <span class="lbl">重启服务</span></button>
+    <button class="navitem asbtn red" onclick="doStop(this)" title="停止服务">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
-      停止服务</button>
+      <span class="lbl">停止服务</span></button>
+  </div>
+
+  <div class="scollapse">
+    <button class="navitem asbtn" id="collapseBtn" type="button" title="收起侧栏">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m18.75 4.5-7.5 7.5 7.5 7.5m-6-15L5.25 12l7.5 7.5"/></svg>
+      <span class="lbl">收起侧栏</span></button>
   </div>
 </aside>
+<div id="backdrop"></div>
 
 <main class="main">
+  <div class="mtop">
+    <button class="iconbtn" id="menuBtn" aria-label="打开菜单">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <b id="mtopTitle">运行概览</b>
+  </div>
+
 <div class="wrap">
 
   <section class="view on" id="view-overview">
     <div class="pagehead">
       <h1>运行概览</h1>
       <span class="desc" id="uptime">–</span>
+      <span class="desc" id="ovAccount">–</span>
       <span class="acts">
+        <select class="kinput" id="statsScope" onchange="onScopeChange(this)" title="选择要查看用量的范围">
+          <option value="">当前账号</option>
+        </select>
         <button class="btn primary" id="btnCheckin" onclick="doCheckin(this)">立即签到</button>
       </span>
     </div>
@@ -319,8 +435,8 @@ tbody tr:last-child td{border-bottom:0}
       <div class="apikeybar" style="margin:0">
         <span class="kb-badge">API Key</span>
         <code id="accKey">…</code>
-        <button class="btn" onclick="copyText(FULL_API_KEY)">复制</button>
-        <span class="kb-note">Bearer Token · 配置在 .env 的 RELAY_API_KEYS</span>
+        <button class="btn" id="accKeyCopy" onclick="copyScopedKey()">复制</button>
+        <span class="kb-note" id="accKeyNote">Bearer Token</span>
       </div>
     </div>
   </section>
@@ -338,7 +454,12 @@ tbody tr:last-child td{border-bottom:0}
       <div id="accounts"><div class="empty">加载中…</div></div>
     </div>
     <div class="card">
-      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>签到记录 <span class="hint">最近 20 次（北京时间）</span></h2>
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>签到记录
+        <span class="hint">最近 20 次（北京时间）</span>
+        <select class="kinput" id="checkinAccount" onchange="loadCheckinHistory()" title="按账号筛选" style="margin-left:auto;padding:3px 8px;font-size:11.5px">
+          <option value="">全部账号</option>
+        </select>
+      </h2>
       <div class="tablewrap" style="max-height:280px">
         <table>
           <thead><tr><th>时间</th><th>账号</th><th>积分</th></tr></thead>
@@ -364,8 +485,12 @@ tbody tr:last-child td{border-bottom:0}
   <section class="view" id="view-models">
     <div class="pagehead">
       <h1>模型白名单</h1>
-      <span class="desc">不勾 = 放行全部</span>
+      <span class="desc" id="allowlistScopeHint">不勾 = 放行全部</span>
       <span class="acts">
+        <select class="kinput" id="allowAccount" onchange="onAllowAccountChange(this)" title="按账号配置白名单">
+          <option value="">全部账号（全局）</option>
+        </select>
+        <button class="btn" onclick="resetAccountAllowlist(this)" id="allowResetBtn" style="display:none">跟随全局</button>
         <button class="btn" onclick="refreshCatalog(this)">刷新模型列表</button>
         <button class="btn primary" onclick="saveAllowlist(this)">保存白名单</button>
       </span>
@@ -388,7 +513,12 @@ tbody tr:last-child td{border-bottom:0}
     <div class="pagehead">
       <h1>请求日志</h1>
       <span class="desc">按请求计 · 北京时间 · 积分带 ≈ 为按费率估算</span>
-      <span class="acts"><button class="btn" onclick="loadUsage(this)">刷新</button></span>
+      <span class="acts">
+        <select class="kinput" id="logAccount" onchange="onLogAccountChange(this)" title="按账号筛选">
+          <option value="">全部账号</option>
+        </select>
+        <button class="btn" onclick="loadUsage(this)">刷新</button>
+      </span>
     </div>
     <div class="card">
       <div class="tablewrap">
@@ -439,6 +569,10 @@ tbody tr:last-child td{border-bottom:0}
     </div>
     <div class="card">
       <div class="arow" style="margin-bottom:10px">
+        <label class="rghint">账号</label>
+        <select class="kinput" id="connAccount" style="min-width:170px">
+          <option value="">当前账号</option>
+        </select>
         <label class="rghint">模型</label>
         <select class="kinput" id="connModel" style="min-width:230px"><option>加载中…</option></select>
         <label class="rghint">超时(秒)</label>
@@ -513,6 +647,25 @@ function fmtTime(ts) {
   return d.toDateString() === now.toDateString() ? hm : (p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + hm);
 }
 function fmtDur(ms) { return ms === undefined || ms === null ? '–' : (ms / 1000).toFixed(2) + 's'; }
+// Account expiry arrives in two shapes: an ISO string ("2026-11-04T15:00:44Z",
+// what OAuth returns) or a raw millisecond epoch ("1794478066723"). Slicing the
+// string blindly turned the epoch into a meaningless "78066", so normalise first
+// and show MM-DD.
+function fmtExpiry(v) {
+  if (v === undefined || v === null || v === '') return '–';
+  let d;
+  const s = String(v).trim();
+  if (/^\d+$/.test(s)) {
+    // 10 digits = seconds, 13 digits = milliseconds.
+    const n = Number(s);
+    d = new Date(s.length <= 10 ? n * 1000 : n);
+  } else {
+    d = new Date(s);
+  }
+  if (isNaN(d.getTime())) return '–';
+  const p = (n) => String(n).padStart(2, '0');
+  return p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
 
 /* ── last-known dashboard cache ── */
 // The first paint must not wait on upstream probes: the console window opens
@@ -549,11 +702,31 @@ function hydrateCache() {
   } catch (e) { /* corrupt cache: fall through to the fetch round */ }
 }
 
+const VIEW_TITLES = { overview: '运行概览', logs: '请求日志', conn: '连接测试', accounts: '账号池', models: '模型白名单', settings: '设置' };
 function showView(name) {
+  if (!VIEW_TITLES[name]) name = 'overview';
   document.querySelectorAll('.navitem[data-v]').forEach((n) => n.classList.toggle('active', n.getAttribute('data-v') === name));
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === 'view-' + name));
+  const mt = $('mtopTitle');
+  if (mt) mt.textContent = VIEW_TITLES[name];
+  document.body.classList.remove('navopen');
+  scrollTo(0, 0);
 }
 window.addEventListener('hashchange', () => showView((location.hash || '#/overview').slice(2) || 'overview'));
+
+/* ── 侧栏折叠：状态持久化（窄屏不参与，改走抽屉） ── */
+const LS_MINI = 'trae2api_navmini';
+const collapseBtn = $('collapseBtn');
+function setMini(on) {
+  document.body.classList.toggle('navmini', on);
+  localStorage.setItem(LS_MINI, on ? '1' : '0');
+  collapseBtn.title = on ? '展开侧栏' : '收起侧栏';
+  collapseBtn.querySelector('.lbl').textContent = on ? '展开侧栏' : '收起侧栏';
+}
+collapseBtn.addEventListener('click', () => setMini(!document.body.classList.contains('navmini')));
+setMini(localStorage.getItem(LS_MINI) === '1');
+$('menuBtn').addEventListener('click', () => document.body.classList.toggle('navopen'));
+$('backdrop').addEventListener('click', () => document.body.classList.remove('navopen'));
 
 /* ── overview: cards + trend + donut ── */
 const UI = [
@@ -570,8 +743,63 @@ function card(i, k, v, s) {
 }
 const PALETTE = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b'];
 
+// The overview is account-scoped: whatever account is active drives every card.
+// null until the account list loads, which is why loadAccounts() calls
+// loadStats() again once it knows the active id.
+let activeAccountId = null;
+// Latest account rows, kept for the scoped credits lookup (per-key views must
+// show the balance of the account that key belongs to).
+let _lastAccounts = [];
+// Explicit "look at this account/key" override picked from the scope dropdown.
+// Empty string means "follow the active account".
+let statsScope = null;   // { kind: 'account'|'key', id: string, label: string } | null
+function onScopeChange(sel) {
+  const v = sel.value;
+  if (!v) { statsScope = null; }
+  else {
+    const [kind, id] = v.split(':', 2);
+    statsScope = { kind, id, label: sel.options[sel.selectedIndex].textContent };
+  }
+  loadStats();
+}
 async function loadStats() {
-  try { statsData = await api('/api/stats'); rememberCache({ stats: statsData }); renderOverview(); } catch (e) { /* keep previous */ }
+  try {
+    let q = '';
+    if (statsScope && statsScope.kind === 'key') q = '?api_key=' + encodeURIComponent(statsScope.id);
+    else if (statsScope && statsScope.kind === 'account') q = '?account_id=' + encodeURIComponent(statsScope.id);
+    else if (activeAccountId) q = '?account_id=' + encodeURIComponent(activeAccountId);
+    statsData = await api('/api/stats' + q);
+    rememberCache({ stats: statsData });
+    renderOverview();
+  } catch (e) { /* keep previous */ }
+}
+// Populate the scope selector from the key/account list. Rebuilt only when the
+// underlying set changes, so a periodic refresh never resets the user's choice.
+let _scopeSig = '';
+async function loadScopeOptions() {
+  const keys = await refreshApiKeys();
+  const sig = JSON.stringify(keys.map((k) => [k.account_id, k.bound, k.api_key]));
+  if (sig === _scopeSig) return;
+  _scopeSig = sig;
+  const sel = $('statsScope');
+  if (!sel) return;
+  const keep = sel.value;
+  const opts = ['<option value="">当前账号</option>'];
+  const accounts = keys.filter((k) => k.bound);
+  if (accounts.length) {
+    opts.push('<optgroup label="按账号">');
+    accounts.forEach((k) => {
+      opts.push(`<option value="account:${esc(k.account_id)}">${esc(k.label)}</option>`);
+    });
+    opts.push('</optgroup>');
+    opts.push('<optgroup label="按 Key">');
+    accounts.forEach((k) => {
+      opts.push(`<option value="key:${esc(k.api_key)}">${esc(k.label)} · ${esc(k.hint)}</option>`);
+    });
+    opts.push('</optgroup>');
+  }
+  sel.innerHTML = opts.join('');
+  if (keep) sel.value = keep;
 }
 let _ovSig = '';
 function renderOverview() {
@@ -590,12 +818,110 @@ function renderOverview() {
     card(1, '累计 Tokens', fmtTok(totTok), totTok ? `${fmtYi(totTok)} · 自 ${(tot.since || '').slice(5)} 起` : '–'),
     card(4, '今日请求', t.requests, t.errors ? `<span class="serr">失败 ${t.errors}</span>` : '全部成功'),
     card(3, '今日消耗积分', '≈' + n2(t.credit), `累计 ≈${n2(tot.credit)}`),
-    card(0, '可用积分', credit !== undefined && credit !== null ? Number(credit).toFixed(0) : '–', '当前账号通用积分'),
+    card(0, '可用积分', ovCredits(), statsScope ? '所选范围的通用积分' : '当前账号通用积分'),
     card(5, '平均首字', t.ttfb_avg_ms > 0 ? (t.ttfb_avg_ms / 1000).toFixed(1) + 's' : '–',
       t.ttfb_n > 0 ? `今日 ${t.ttfb_n} 次流式` : '今日暂无流式'),
   ].join('');
+  paintOvAccount();
+  paintScopedKey();
   renderTrend();
   renderDist();
+}
+// Header label: which account the numbers belong to, and whether that account
+// has any recorded history yet (per-account stats start from this build).
+// "接入信息" must describe the key that actually serves the selected scope.
+// Showing the .env global key here while the cards below are scoped to one
+// account tells the user to configure a client with a key that runs on a
+// different account - the exact confusion this block caused.
+function scopedKeyInfo() {
+  const acctOf = (accountId) => (_lastAccounts || []).find((a) => a.id === accountId) || null;
+  if (statsScope && statsScope.kind === 'key') {
+    const row = apiKeyCache.find((k) => k.api_key === statsScope.id);
+    return {
+      key: statsScope.id,
+      label: (row && row.label) || statsScope.label,
+      note: '该账号专属 Key · 只会调用这一个账号',
+    };
+  }
+  if (statsScope && statsScope.kind === 'account') {
+    const a = acctOf(statsScope.id);
+    const k = apiKeyCache.find((x) => x.bound && x.account_id === statsScope.id);
+    if (k) {
+      return { key: k.api_key, label: a && a.label, note: '该账号专属 Key · 只会调用这一个账号' };
+    }
+    return {
+      key: '', label: a && a.label,
+      note: '该账号还没绑定专属 Key（去「账号池」生成），当前只能用全局 Key 调度',
+    };
+  }
+  // No explicit scope: follow the active account, same as the cards above.
+  const activeKey = activeAccountId
+    && apiKeyCache.find((k) => k.bound && k.account_id === activeAccountId);
+  if (activeKey) {
+    const a = acctOf(activeAccountId);
+    return {
+      key: activeKey.api_key,
+      label: (a && a.label) || activeKey.label,
+      note: '当前账号专属 Key · 只会调用这一个账号',
+    };
+  }
+  return {
+    key: FULL_API_KEY,
+    label: '',
+    note: '全局 Key（.env 的 RELAY_API_KEYS）· 按当前账号/轮询分发',
+  };
+}
+function paintScopedKey() {
+  const el = $('accKey'), note = $('accKeyNote');
+  if (!el) return;
+  const info = scopedKeyInfo();
+  const k = info.key || '';
+  el.textContent = k ? (k.length > 20 ? k.slice(0, 12) + '…' + k.slice(-4) : k) : '(未绑定)';
+  el.style.opacity = k ? '1' : '.6';
+  if (note) note.textContent = info.note;
+  const btn = $('accKeyCopy');
+  if (btn) btn.disabled = !k;
+}
+async function copyScopedKey() {
+  const info = scopedKeyInfo();
+  if (!info.key) { toast('该账号还没有专属 Key，请先在「账号池」生成', false); return; }
+  await copyText(info.key);
+}
+// Credits belong to the account the numbers are scoped to, not to whatever
+// account happens to be globally active - otherwise a per-key view would show
+// the wrong balance next to the right token counts.
+function ovCredits() {
+  const remainingOf = (a) => {
+    if (!a) return null;
+    const gen = (a.credits && a.credits.account_credits) || a.account_credits || {};
+    if (gen.unlimited) return '∞';
+    if (gen.remaining !== undefined && gen.remaining !== null) return Number(gen.remaining).toFixed(0);
+    return null;
+  };
+  if (statsScope) {
+    let row = null;
+    if (statsScope.kind === 'account') row = _lastAccounts.find((x) => x.id === statsScope.id);
+    else {
+      const k = apiKeyCache.find((x) => x.api_key === statsScope.id);
+      row = k ? _lastAccounts.find((x) => x.id === k.account_id) : null;
+    }
+    const v = remainingOf(row);
+    return v === null ? '–' : v;
+  }
+  return lastOverview && lastOverview.credits !== undefined && lastOverview.credits !== null
+    ? Number(lastOverview.credits).toFixed(0) : '–';
+}
+function paintOvAccount() {
+  const el = $('ovAccount');
+  if (!el) return;
+  // An explicit scope choice wins over the active-account label.
+  if (statsScope && statsData) {
+    el.textContent = (statsScope.kind === 'key' ? 'Key：' : '账号：') + statsScope.label;
+    return;
+  }
+  if (!statsData || !statsData.scoped_account) { el.textContent = '账号池合计'; return; }
+  const name = (lastOverview && lastOverview.activeLabel) || statsData.scoped_account;
+  el.textContent = statsData.scoped ? `账号：${name}` : `账号：${name}（暂无记录）`;
 }
 function renderTrend() {
   const el = $('trend');
@@ -639,14 +965,27 @@ function renderDist() {
 let _acctSig = '';
 function paintAccounts(d, force) {
   const accts = d.accounts || [];
+  _lastAccounts = accts;
   const active = accts.find((a) => a.id === d.active) || accts[0];
   lastOverview = Object.assign({}, lastOverview, { credits: null });
   if (active) {
     const gen = (active.credits && active.credits.account_credits) || active.account_credits;
     if (gen && !gen.unlimited) lastOverview.credits = gen.remaining;
+    lastOverview.activeLabel = active.label || active.user_id || active.id;
   }
   $('acctHint').textContent = accts.length + ' 个账号 · 当前 ' + ((active && (active.label || active.user_id)) || '–');
+  // Switching the active account must re-scope the overview, otherwise the
+  // cards keep showing the previous account's numbers.
+  const nextActiveId = (active && (active.id || active.user_id)) || null;
+  if (nextActiveId && nextActiveId !== activeAccountId) {
+    activeAccountId = nextActiveId;
+    loadStats();
+  }
   if (statsData) renderOverview();
+  // Account rows may have just arrived, so the scoped key block can finally
+  // resolve which key serves this account.
+  paintScopedKey();
+  fillAccountFilters(accts);
   // Auto-refresh must not rebuild the list under the cursor (a click landing
   // between render and handler would hit a detached node), so only re-render
   // when the payload actually changed.
@@ -673,7 +1012,14 @@ function paintAccounts(d, force) {
         <div class="astats">
           <span><i>通用积分</i><b>${rem}</b></span>
           <span><i>总积分</i><b>${tot}</b></span>
-          <span><i>有效期</i><b>${esc((a.expires || '').slice(5, 10) || '–')}</b></span>
+          <span><i>有效期</i><b>${esc(fmtExpiry(a.expires))}</b></span>
+        </div>
+        <div class="akey">
+          <span class="akey-lbl">专属 Key</span>
+          <code class="akey-val${a.has_api_key ? '' : ' none'}">${a.has_api_key ? esc(a.api_key_hint) : '未绑定（该账号只能被全局 key 调度到）'}</code>
+          <button class="mini" onclick="editAccountKey('${esc(a.id)}')">${a.has_api_key ? '更换' : '生成'}</button>
+          ${a.has_api_key ? `<button class="mini" onclick="copyAccountKey('${esc(a.id)}')">复制</button>
+          <button class="mini" onclick="clearAccountKey('${esc(a.id)}')">清除</button>` : ''}
         </div>
         <div class="aacts">
           <button class="btn${checked ? ' done' : ' primary'}" onclick="checkinOne('${esc(a.id)}',this)"${checked ? ' disabled' : ''}>${checked ? '今日已签' : '签到'}</button>
@@ -694,6 +1040,54 @@ async function loadAccounts(force) {
   catch (e) { $('accounts').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   rememberCache({ accounts: d });
   paintAccounts(d, force);
+}
+
+/* ── per-account API keys ── */
+// Keys are only ever returned in full by /api/api-keys (a local, no-store
+// endpoint), so the copied value is re-read there rather than embedded in the
+// card markup.
+let apiKeyCache = [];
+async function refreshApiKeys() {
+  try {
+    const d = await api('/api/api-keys');
+    apiKeyCache = d.keys || [];
+  } catch (e) { apiKeyCache = []; }
+  paintScopedKey();
+  return apiKeyCache;
+}
+async function setAccountKey(accountId, opts) {
+  const d = await post('/api/accounts/api-key', Object.assign({ account_id: accountId }, opts || {}));
+  await refreshApiKeys();
+  await loadAccounts(true);
+  return d;
+}
+async function editAccountKey(accountId) {
+  // One prompt for the value: blank = generate a fresh one. Avoiding a
+  // two-step confirm keeps this to a single interaction per account.
+  const typed = prompt(
+    '为该账号设置专属 API Key（直接生成请留空点确定）\n\n' +
+    '绑定后该 key 只能调用这一个账号；账号不可用时直接报错，不会自动换号。',
+    ''
+  );
+  if (typed === null) return;                       // user cancelled
+  const value = String(typed).trim();
+  try {
+    await setAccountKey(accountId, value ? { api_key: value } : { generate: true });
+    toast(value ? '已绑定专属 Key' : '已生成专属 Key（点「复制」获取完整值）', true);
+  } catch (e) { toast(String(e.message || e), false); }
+}
+async function copyAccountKey(accountId) {
+  await refreshApiKeys();
+  const row = apiKeyCache.find((k) => k.account_id === accountId && k.bound);
+  if (!row || !row.api_key) { toast('未找到该账号的 key', false); return; }
+  await copyText(row.api_key);
+}
+async function clearAccountKey(accountId) {
+  if (!confirm('清除该账号的专属 Key？\n\n清除后这个 key 立即失效，该账号只能被全局 key 调度到。')) return;
+  try {
+    await setAccountKey(accountId, { api_key: '' });
+    toast('已清除专属 Key', true);
+  } catch (e) { toast(String(e.message || e), false); }
 }
 // A claim grants credits at the entitlement API, which nothing else in the
 // post-claim reload touches; without this pull the 可用积分 card keeps the
@@ -720,13 +1114,21 @@ async function switchAccount(id, btn) {
   busy(btn, true);
   try { await post('/api/accounts/switch', { account_id: id }); toast('已切换账号', true); }
   catch (e) { toast(String(e.message || e), false); }
-  finally { busy(btn, false); loadAccounts(true); loadStats(); }
+  finally {
+    busy(btn, false);
+    // Order matters: loadAccounts() resolves the new active id and re-scopes
+    // the overview. Running loadStats() first would fetch the OLD account.
+    await loadAccounts(true);
+    loadCheckinHistory();
+  }
 }
 async function removeAccount(id) {
   if (!confirm('确定删除该账号？凭证将从本机移除。')) return;
   try { await post('/api/accounts/remove', { account_id: id }); toast('已删除', true); }
   catch (e) { toast(String(e.message || e), false); }
-  loadAccounts();
+  // Deleting the active account moves the pointer: reload accounts first so the
+  // overview re-scopes to whichever account is now active.
+  await loadAccounts(true);
 }
 async function refreshCredits(btn) {
   busy(btn, true);
@@ -736,15 +1138,37 @@ async function refreshCredits(btn) {
 }
 let _chkSig = '';
 async function loadCheckinHistory() {
+  const acct = ($('checkinAccount') && $('checkinAccount').value) || '';
   let d;
-  try { d = await api('/api/checkin/history'); } catch (e) { return; }
+  try {
+    d = await api('/api/checkin/history' + (acct ? '?account_id=' + encodeURIComponent(acct) : ''));
+  } catch (e) { return; }
   const rows = (d && d.records) || [];
-  const sig = JSON.stringify(rows);
+  const sig = JSON.stringify(rows) + '|' + acct;
   if (sig === _chkSig) return;
   _chkSig = sig;
   $('checkinBody').innerHTML = rows.length
     ? rows.slice(0, 20).map((r) => `<tr><td class="mono">${fmtTime(r.timestamp)}</td><td>${esc(r.label || r.account_id || '–')}</td><td class="mono">${r.credits != null ? '+' + esc(String(r.credits)) : '–'}</td></tr>`).join('')
-    : '<tr><td colspan="3" class="empty">还没有签到记录</td></tr>';
+    : `<tr><td colspan="3" class="empty">${acct ? '该账号还没有签到记录' : '还没有签到记录'}</td></tr>`;
+}
+// Fill the three per-view account filters once the account list is known.
+// Each keeps its own selection so switching views does not reset the others.
+function fillAccountFilters(accts) {
+  const ids = [['logAccount', '全部账号'], ['checkinAccount', '全部账号'], ['allowAccount', '全部账号（全局）'], ['connAccount', '当前账号']];
+  ids.forEach(([id, allLabel]) => {
+    const sel = $(id);
+    if (!sel) return;
+    const keep = sel.value;
+    sel.innerHTML = `<option value="">${allLabel}</option>` +
+      accts.map((a) => `<option value="${esc(a.id)}">${esc(a.label || a.user_id || a.id)}</option>`).join('');
+    if (keep) sel.value = keep;
+  });
+}
+function onLogAccountChange(sel) {
+  // Force a re-fetch even if the row payload looks identical, because the
+  // scope changed.
+  _logSig = '';
+  loadUsage(true);
 }
 async function addManualAccount(btn) {
   const token = $('manualToken').value.trim();
@@ -830,29 +1254,87 @@ function updateMcount() {
     ? `已选 ${allowlist.length} / 共 ${allModels.length} 个模型` + (allowlist.length ? '' : '（放行全部）')
     : '暂无可用模型';
 }
+// Current allowlist scope: "" = global defaults, otherwise one account's own
+// list. `allowScopeSpecific` records whether that account has an override yet.
+let allowScopeId = '';
+let allowScopeSpecific = false;
 async function loadAllowlist() {
   try {
-    const d = await api('/api/allowlist');
+    const q = allowScopeId ? '?account_id=' + encodeURIComponent(allowScopeId) : '';
+    const d = await api('/api/allowlist' + q, null, 40000);
     allowlist = (d.allowed || []).slice();
+    allowScopeSpecific = !!d.account_specific;
+    paintAllowScope(d);
     if (!allModels.length) await refreshCatalog(null, true);
     else renderModels();
-  } catch (e) { /* keep */ }
+  } catch (e) {
+    // Render the failure instead of leaving the "加载中…" placeholder up
+    // forever: a silent catch is indistinguishable from a dead console.
+    const el = $('modelList');
+    if (el && !allModels.length) {
+      el.innerHTML = '<span class="empty">模型目录加载失败，点「刷新模型列表」重试</span>';
+    }
+    updateMcount();
+    fillConnModels();
+  }
+}
+function paintAllowScope(d) {
+  const hint = $('allowlistScopeHint');
+  const reset = $('allowResetBtn');
+  if (reset) reset.style.display = allowScopeId && allowScopeSpecific ? '' : 'none';
+  if (!hint) return;
+  if (!allowScopeId) { hint.textContent = '全局设置 · 不勾 = 放行全部'; return; }
+  const sel = $('allowAccount');
+  const label = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].textContent : allowScopeId;
+  hint.textContent = allowScopeSpecific
+    ? `${label} 专属白名单 · 不勾 = 放行全部`
+    : `${label} 暂未单独配置，当前跟随全局`;
+}
+function onAllowAccountChange(sel) {
+  allowScopeId = sel.value;
+  loadAllowlist();
+}
+async function resetAccountAllowlist(btn) {
+  if (!allowScopeId) return;
+  busy(btn, true);
+  try {
+    await post('/api/allowlist', { ids: [], account_id: allowScopeId, reset_account: true });
+    toast('已恢复为跟随全局白名单', true);
+    await loadAllowlist();
+  } catch (e) { toast(String(e.message || e), false); }
+  finally { busy(btn, false); }
 }
 async function refreshCatalog(btn, quiet) {
   if (btn) busy(btn, true);
   try {
-    const d = await api('/v1/models?refresh=1&all=1', null, 40000);
+    // The catalog belongs to an account too: a key/account may be entitled to
+    // models the active one is not.
+    const q = 'refresh=1&all=1' + (allowScopeId ? '&account_id=' + encodeURIComponent(allowScopeId) : '');
+    const d = await api('/v1/models?' + q, null, 40000);
     allModels = (d && d.data) || [];
     renderModels();
     if (!quiet) toast('模型列表已刷新：' + allModels.length + ' 个', true);
-  } catch (e) { if (!quiet) toast(String(e.message || e), false); }
+    if (quiet && !allModels.length) toast('上游未返回模型目录，检查网络或上游可达性', false);
+  } catch (e) {
+    if (!quiet) toast(String(e.message || e), false);
+    // Even on failure, drop the stale "加载中…" so the page is not stuck.
+    const el = $('modelList');
+    if (el && !allModels.length) {
+      el.innerHTML = '<span class="empty">模型目录加载失败，点「刷新模型列表」重试</span>';
+    }
+    updateMcount();
+    fillConnModels();
+  }
   finally { if (btn) busy(btn, false); }
 }
 async function saveAllowlist(btn) {
   busy(btn, true);
   try {
-    const d = await post('/api/allowlist', { ids: allowlist });
-    toast('白名单已保存' + (d.count !== undefined ? '（' + d.count + ' 个模型）' : ''), true);
+    const payload = { ids: allowlist };
+    if (allowScopeId) payload.account_id = allowScopeId;
+    const d = await post('/api/allowlist', payload);
+    const where = allowScopeId ? '（该账号专属）' : '（全局）';
+    toast('白名单已保存' + where + (d.count !== undefined ? '：' + d.count + ' 个模型' : ''), true);
     await loadAllowlist();
   } catch (e) { toast(String(e.message || e), false); }
   finally { busy(btn, false); }
@@ -870,11 +1352,12 @@ let _logSig = '';
 async function loadUsage(force) {
   const btn = force === true ? null : force;
   if (btn) busy(btn, true);
+  const acct = ($('logAccount') && $('logAccount').value) || '';
   try {
-    const d = await api('/api/usage/records');
+    const d = await api('/api/usage/records' + (acct ? '?account_id=' + encodeURIComponent(acct) : ''));
     const rows = Array.isArray(d) ? d : ((d && (d.records || d.data)) || []);
     // Re-rendering resets the scroll position, so skip an unchanged payload.
-    const sig = JSON.stringify(rows);
+    const sig = JSON.stringify(rows) + '|' + acct;
     if (sig === _logSig && force !== true) return;
     _logSig = sig;
     $('logBody').innerHTML = rows.length ? rows.map((r) => {
@@ -921,7 +1404,10 @@ async function runConnTest(btn) {
     const cs = job.row.querySelector('.cs'), ct = job.row.querySelector('.ct'), cd = job.row.querySelector('.cd');
     cs.textContent = '测试中…';
     try {
-      const d = await post('/api/model-test', { model, mode: job.mode, timeout }, (timeout + 20) * 1000);
+      const probeAccount = ($('connAccount') && $('connAccount').value) || '';
+      const params = { model, mode: job.mode, timeout };
+      if (probeAccount) params.account_id = probeAccount;
+      const d = await post('/api/model-test', params, (timeout + 20) * 1000);
       ct.textContent = fmtDur(d.elapsed_ms);
       const ok = d.success !== false && d.ok !== false;
       if (ok) { passed++; cs.innerHTML = '<span class="badge ok">通过</span>'; cd.textContent = d.detail || d.preview || d.message || (job.mode === 'tool' ? '工具调用返回正常' : '文本回复正常'); }
@@ -1072,9 +1558,14 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && li
 
 (async function boot() {
   showView((location.hash || '#/overview').slice(2) || 'overview');
-  $('accKey').textContent = FULL_API_KEY ? (FULL_API_KEY.slice(0, 12) + '…' + FULL_API_KEY.slice(-4)) : '(未设置)';
+  // accKey is painted by paintScopedKey() once the account/key data is in:
+  // it must reflect the selected scope, not a hardcoded .env key.
   hydrateCache();
-  await Promise.all([loadStatus(), loadStats(), loadAccounts(), loadCheckinHistory(), loadUsage(), loadAllowlist(), loadSettings()]);
+  // Scope options first: it also primes the key cache the account cards use for
+  // "copy full key". loadAccounts() then supplies the per-account credits that
+  // a scoped overview needs, and re-scopes stats to the active account.
+  await Promise.all([loadStatus(), loadScopeOptions(), loadAccounts()]);
+  await Promise.all([loadStats(), loadCheckinHistory(), loadUsage(), loadAllowlist(), loadSettings()]);
   liveAt = Date.now();
   startLive();
   paintLive();
